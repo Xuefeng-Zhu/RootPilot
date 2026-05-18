@@ -39,8 +39,11 @@ function isValidISO8601(value: string): boolean {
 }
 
 function toClickHouseDateTime(value: Date | string): string {
-  const raw = value instanceof Date ? value.toISOString() : value;
-  return raw.replace('T', ' ').replace(/Z$/, '');
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function parseUtcDateTime64(paramName: string): string {
+  return `parseDateTime64BestEffort({${paramName}:String}, 3, 'UTC')`;
 }
 
 /**
@@ -162,14 +165,14 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
       // Build time range defaults
       const now = new Date();
       const defaultFrom = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
-      const fromTime = toClickHouseDateTime(from ? new Date(from) : defaultFrom);
-      const toTime = toClickHouseDateTime(to ? new Date(to) : now);
+      const fromTime = toClickHouseDateTime(from ?? defaultFrom);
+      const toTime = toClickHouseDateTime(to ?? now);
 
       // Build WHERE conditions for the spans table
       const conditions: string[] = [
         `tenant_id = {tenantId:String}`,
-        `timestamp >= {fromTime:DateTime64(3)}`,
-        `timestamp <= {toTime:DateTime64(3)}`,
+        `timestamp >= ${parseUtcDateTime64('fromTime')}`,
+        `timestamp <= ${parseUtcDateTime64('toTime')}`,
       ];
       const params: Record<string, unknown> = {
         tenantId,
@@ -202,7 +205,7 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
       // Cursor-based pagination: filter after aggregation
       if (decodedCursor) {
         havingConditions.push(
-          `(trace_timestamp < {cursorTs:DateTime64(3)} OR (trace_timestamp = {cursorTs:DateTime64(3)} AND trace_id < {cursorId:String}))`,
+          `(trace_timestamp < ${parseUtcDateTime64('cursorTs')} OR (trace_timestamp = ${parseUtcDateTime64('cursorTs')} AND trace_id < {cursorId:String}))`,
         );
         params.cursorTs = toClickHouseDateTime(decodedCursor.ts);
         params.cursorId = decodedCursor.id;

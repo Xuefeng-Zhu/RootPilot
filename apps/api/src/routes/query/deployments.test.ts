@@ -279,10 +279,30 @@ describe('GET /v1/deployments', () => {
       });
 
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryText).toContain('timestamp >= {from:DateTime64(3)}');
-      expect(queryText).toContain('timestamp <= {to:DateTime64(3)}');
-      expect(queryParams.from).toBe('2024-01-01 00:00:00.000');
-      expect(queryParams.to).toBe('2024-01-31 23:59:59.000');
+      expect(queryText).toContain(
+        "timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC')",
+      );
+      expect(queryText).toContain("timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')");
+      expect(queryParams.from).toBe('2024-01-01T00:00:00Z');
+      expect(queryParams.to).toBe('2024-01-31T23:59:59Z');
+    });
+
+    it('preserves explicit timezone offsets for UTC-aware ClickHouse parsing', async () => {
+      mockClickhouseQuery.mockResolvedValue([]);
+
+      await app.inject({
+        method: 'GET',
+        url: '/v1/deployments?from=2024-01-01T02:00:00-08:00&to=2024-01-01T03:30:00-08:00',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+      expect(queryText).toContain(
+        "timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC')",
+      );
+      expect(queryText).toContain("timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')");
+      expect(queryParams.from).toBe('2024-01-01T02:00:00-08:00');
+      expect(queryParams.to).toBe('2024-01-01T03:30:00-08:00');
     });
 
     it('uses default limit of 50', async () => {
@@ -398,9 +418,11 @@ describe('GET /v1/deployments', () => {
       });
 
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryText).toContain('timestamp < {cursorTs:DateTime64(3)}');
+      expect(queryText).toContain(
+        "timestamp < parseDateTime64BestEffort({cursorTs:String}, 3, 'UTC')",
+      );
       expect(queryText).toContain('deployment_id < {cursorId:String}');
-      expect(queryParams.cursorTs).toBe('2024-01-15 10:00:00.000');
+      expect(queryParams.cursorTs).toBe('2024-01-15T10:00:00.000');
       expect(queryParams.cursorId).toBe('deploy-50');
     });
   });

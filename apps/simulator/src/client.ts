@@ -1,5 +1,6 @@
 import { buildLogPayloads, buildMetricPayloads, buildTracePayloads } from './payloads.js';
 import { sleep } from './time.js';
+import type { LogsPayload, MetricsPayload, TracesPayload } from './payloads.js';
 import type { HttpFetch, SendResult, SimulatorConfig, TelemetryBatch } from './types.js';
 
 export class SimulatorApiClient {
@@ -63,35 +64,116 @@ export async function sendTelemetryBatch(
   batch: TelemetryBatch,
   client = new SimulatorApiClient(config.baseUrl, config.apiKey),
 ): Promise<SendResult> {
+  const result: SendResult = {
+    logsSent: 0,
+    spansSent: 0,
+    metricsSent: 0,
+    deploymentEventsSent: 0,
+    failedHttpRequests: 0,
+  };
+
   if (config.dryRun) {
-    return { failedHttpRequests: 0 };
+    return result;
   }
 
-  let failedHttpRequests = 0;
-  const attempts: Array<Promise<void>> = [];
+  const attempts: SendAttempt[] = [];
 
   for (const deployment of batch.deploymentEvents) {
-    attempts.push(client.postJson('/v1/events/deployments', deployment));
+    attempts.push({
+      kind: 'deployments',
+      count: 1,
+      promise: client.postJson('/v1/events/deployments', deployment),
+    });
   }
   for (const payload of buildLogPayloads(batch.logs)) {
-    attempts.push(client.postJson('/v1/ingest/logs', payload));
+    attempts.push({
+      kind: 'logs',
+      count: countLogs(payload),
+      promise: client.postJson('/v1/ingest/logs', payload),
+    });
   }
   for (const payload of buildTracePayloads(batch.spans)) {
-    attempts.push(client.postJson('/v1/ingest/traces', payload));
+    attempts.push({
+      kind: 'spans',
+      count: countSpans(payload),
+      promise: client.postJson('/v1/ingest/traces', payload),
+    });
   }
   for (const payload of buildMetricPayloads(batch.metrics)) {
-    attempts.push(client.postJson('/v1/ingest/metrics', payload));
+    attempts.push({
+      kind: 'metrics',
+      count: countMetricDataPoints(payload),
+      promise: client.postJson('/v1/ingest/metrics', payload),
+    });
   }
 
-  const settled = await Promise.allSettled(attempts);
-  for (const result of settled) {
-    if (result.status === 'rejected') {
-      failedHttpRequests += 1;
-      console.error(`[simulator] ${formatHttpError(result.reason, config.baseUrl)}`);
+  const settled = await Promise.allSettled(attempts.map((attempt) => attempt.promise));
+  settled.forEach((settledAttempt, index) => {
+    const attempt = attempts[index];
+    if (!attempt) return;
+
+    if (settledAttempt.status === 'rejected') {
+      result.failedHttpRequests += 1;
+      console.error(`[simulator] ${formatHttpError(settledAttempt.reason, config.baseUrl)}`);
+      return;
     }
-  }
 
-  return { failedHttpRequests };
+    if (attempt.kind === 'logs') result.logsSent += attempt.count;
+    if (attempt.kind === 'spans') result.spansSent += attempt.count;
+    if (attempt.kind === 'metrics') result.metricsSent += attempt.count;
+    if (attempt.kind === 'deployments') result.deploymentEventsSent += attempt.count;
+  });
+
+  return result;
+}
+
+type SendAttemptKind = 'logs' | 'spans' | 'metrics' | 'deployments';
+
+interface SendAttempt {
+  kind: SendAttemptKind;
+  count: number;
+  promise: Promise<void>;
+}
+
+function countLogs(payload: LogsPayload): number {
+  return payload.resourceLogs.reduce(
+    (resourceSum, resourceLog) =>
+      resourceSum +
+      resourceLog.scopeLogs.reduce(
+        (scopeSum, scopeLog) => scopeSum + scopeLog.logRecords.length,
+        0,
+      ),
+    0,
+  );
+}
+
+function countSpans(payload: TracesPayload): number {
+  return payload.resourceSpans.reduce(
+    (resourceSum, resourceSpan) =>
+      resourceSum +
+      resourceSpan.scopeSpans.reduce((scopeSum, scopeSpan) => scopeSum + scopeSpan.spans.length, 0),
+    0,
+  );
+}
+
+function countMetricDataPoints(payload: MetricsPayload): number {
+  return payload.resourceMetrics.reduce(
+    (resourceSum, resourceMetric) =>
+      resourceSum +
+      resourceMetric.scopeMetrics.reduce(
+        (scopeSum, scopeMetric) =>
+          scopeSum +
+          scopeMetric.metrics.reduce((metricSum, metric) => {
+            return (
+              metricSum +
+              (metric.gauge?.dataPoints.length ?? 0) +
+              (metric.sum?.dataPoints.length ?? 0)
+            );
+          }, 0),
+        0,
+      ),
+    0,
+  );
 }
 
 function formatHttpError(reason: unknown, baseUrl: string): string {

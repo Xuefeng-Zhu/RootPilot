@@ -172,9 +172,43 @@ describe('SimulatorApiClient', () => {
       requestCount: 1,
     });
 
-    await sendTelemetryBatch(config({ dryRun: true }), batch, client);
+    const result = await sendTelemetryBatch(config({ dryRun: true }), batch, client);
 
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      logsSent: 0,
+      spansSent: 0,
+      metricsSent: 0,
+      deploymentEventsSent: 0,
+      failedHttpRequests: 0,
+    });
+  });
+
+  it('counts telemetry as sent only when the matching HTTP request succeeds', async () => {
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input.endsWith('/v1/ingest/traces')) {
+        return new Response('invalid trace payload', { status: 400 });
+      }
+      return new Response('', { status: 202 });
+    }) as unknown as HttpFetch;
+    const client = new SimulatorApiClient('http://localhost:4000', 'rootpilot_demo_key', fetchMock);
+    const batch = new TelemetryGenerator(config()).generateBatch({
+      timestamp: new Date('2026-05-18T12:00:00.000Z'),
+      requestCount: 1,
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      const result = await sendTelemetryBatch(config(), batch, client);
+
+      expect(result.logsSent).toBe(batch.logs.length);
+      expect(result.spansSent).toBe(0);
+      expect(result.metricsSent).toBe(batch.metrics.length);
+      expect(result.deploymentEventsSent).toBe(batch.deploymentEvents.length);
+      expect(result.failedHttpRequests).toBe(1);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
 

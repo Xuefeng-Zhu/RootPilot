@@ -286,8 +286,12 @@ describe('GET /v1/traces', () => {
 
       expect(mockClickhouseQuery).toHaveBeenCalledTimes(1);
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryText).toContain('timestamp >= {fromTime:DateTime64(3)}');
-      expect(queryText).toContain('timestamp <= {toTime:DateTime64(3)}');
+      expect(queryText).toContain(
+        "timestamp >= parseDateTime64BestEffort({fromTime:String}, 3, 'UTC')",
+      );
+      expect(queryText).toContain(
+        "timestamp <= parseDateTime64BestEffort({toTime:String}, 3, 'UTC')",
+      );
       expect(queryParams.fromTime).toBeDefined();
       expect(queryParams.toTime).toBeDefined();
 
@@ -366,8 +370,28 @@ describe('GET /v1/traces', () => {
       });
 
       const [, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryParams.fromTime).toBe('2024-01-15 00:00:00.000');
-      expect(queryParams.toTime).toBe('2024-01-15 23:59:59.000');
+      expect(queryParams.fromTime).toBe('2024-01-15T00:00:00Z');
+      expect(queryParams.toTime).toBe('2024-01-15T23:59:59Z');
+    });
+
+    it('preserves explicit timezone offsets for UTC-aware ClickHouse parsing', async () => {
+      mockClickhouseQuery.mockResolvedValue([]);
+
+      await app.inject({
+        method: 'GET',
+        url: '/v1/traces?from=2024-01-15T02:00:00-08:00&to=2024-01-15T03:30:00-08:00',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+      expect(queryText).toContain(
+        "timestamp >= parseDateTime64BestEffort({fromTime:String}, 3, 'UTC')",
+      );
+      expect(queryText).toContain(
+        "timestamp <= parseDateTime64BestEffort({toTime:String}, 3, 'UTC')",
+      );
+      expect(queryParams.fromTime).toBe('2024-01-15T02:00:00-08:00');
+      expect(queryParams.toTime).toBe('2024-01-15T03:30:00-08:00');
     });
 
     it('uses default limit of 50 when not specified', async () => {
@@ -489,7 +513,7 @@ describe('GET /v1/traces', () => {
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
       expect(queryText).toContain('cursorTs');
       expect(queryText).toContain('cursorId');
-      expect(queryParams.cursorTs).toBe('2024-01-15 10:00:00.000');
+      expect(queryParams.cursorTs).toBe('2024-01-15T10:00:00.000');
       expect(queryParams.cursorId).toBe('trace-50');
     });
   });

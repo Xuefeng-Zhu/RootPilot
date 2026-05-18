@@ -93,6 +93,9 @@ export default function LogsExplorerPage() {
 
   // Ref for debounce
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const logScrollRef = useRef<HTMLDivElement | null>(null);
+  const infiniteLoaderRef = useRef<HTMLDivElement | null>(null);
+  const loadingMoreRef = useRef(false);
 
   // ─── Fetch services for dropdowns ────────────────────────────────────────
   useEffect(() => {
@@ -129,7 +132,11 @@ export default function LogsExplorerPage() {
   // ─── Fetch logs ──────────────────────────────────────────────────────────
   const fetchLogs = useCallback(
     async (append = false, pageCursor?: string | null) => {
+      if (append && loadingMoreRef.current) {
+        return;
+      }
       if (append) {
+        loadingMoreRef.current = true;
         setLoadingMore(true);
       } else {
         setLoading(true);
@@ -165,16 +172,17 @@ export default function LogsExplorerPage() {
         setHasMore(res.pagination.hasMore);
       } catch (err) {
         const message =
-          err instanceof ApiError
-            ? err.message
-            : 'Failed to fetch logs. Please try again.';
+          err instanceof ApiError ? err.message : 'Failed to fetch logs. Please try again.';
         setError(message);
       } finally {
         setLoading(false);
         setLoadingMore(false);
+        if (append) {
+          loadingMoreRef.current = false;
+        }
       }
     },
-    [getTimeRange, service, environment, search, selectedSeverities]
+    [getTimeRange, service, environment, search, selectedSeverities],
   );
 
   // ─── Initial fetch and refetch on filter change ──────────────────────────
@@ -206,18 +214,39 @@ export default function LogsExplorerPage() {
     });
   };
 
-  // ─── Load more ──────────────────────────────────────────────────────────
-  const handleLoadMore = () => {
+  // ─── Infinite loading ───────────────────────────────────────────────────
+  const loadMoreLogs = useCallback(() => {
     if (hasMore && cursor) {
       fetchLogs(true, cursor);
     }
-  };
+  }, [cursor, fetchLogs, hasMore]);
+
+  useEffect(() => {
+    const loader = infiniteLoaderRef.current;
+    if (!loader || !hasMore || loading || loadingMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMoreLogs();
+        }
+      },
+      {
+        root: logScrollRef.current,
+        rootMargin: '240px 0px',
+        threshold: 0,
+      },
+    );
+
+    observer.observe(loader);
+    return () => observer.disconnect();
+  }, [hasMore, loadMoreLogs, loading, loadingMore]);
 
   // ─── Filter logs client-side for multi-severity ─────────────────────────
   const displayedLogs =
-    selectedSeverities.size > 1
-      ? logs.filter((log) => selectedSeverities.has(log.severity))
-      : logs;
+    selectedSeverities.size > 1 ? logs.filter((log) => selectedSeverities.has(log.severity)) : logs;
 
   // ─── Render ─────────────────────────────────────────────────────────────
   return (
@@ -262,14 +291,18 @@ export default function LogsExplorerPage() {
             <input
               type="datetime-local"
               value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value ? new Date(e.target.value).toISOString() : '')}
+              onChange={(e) =>
+                setCustomFrom(e.target.value ? new Date(e.target.value).toISOString() : '')
+              }
               className="px-2 py-1.5 text-xs bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
             />
             <span className="text-gray-500 text-xs">to</span>
             <input
               type="datetime-local"
               value={customTo}
-              onChange={(e) => setCustomTo(e.target.value ? new Date(e.target.value).toISOString() : '')}
+              onChange={(e) =>
+                setCustomTo(e.target.value ? new Date(e.target.value).toISOString() : '')
+              }
               className="px-2 py-1.5 text-xs bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
             />
           </div>
@@ -342,7 +375,7 @@ export default function LogsExplorerPage() {
       )}
 
       {/* Logs table */}
-      <div className="flex-1 overflow-auto border border-surface-border rounded">
+      <div ref={logScrollRef} className="flex-1 overflow-auto border border-surface-border rounded">
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="text-gray-400 text-sm">Loading logs...</div>
@@ -351,72 +384,68 @@ export default function LogsExplorerPage() {
           <div className="flex items-center justify-center py-16">
             <div className="text-center">
               <p className="text-gray-400 text-sm">No results found</p>
-              <p className="text-gray-500 text-xs mt-1">
-                Try adjusting your filters or time range
-              </p>
+              <p className="text-gray-500 text-xs mt-1">Try adjusting your filters or time range</p>
             </div>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-surface-card border-b border-surface-border">
-              <tr>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase tracking-wider w-44">
-                  Timestamp
-                </th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase tracking-wider w-36">
-                  Service
-                </th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase tracking-wider w-24">
-                  Severity
-                </th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase tracking-wider">
-                  Message
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-border">
-              {displayedLogs.map((log) => (
-                <tr
-                  key={log.id}
-                  onClick={() => setSelectedLog(log)}
-                  className="hover:bg-surface-card/50 cursor-pointer transition-colors"
-                >
-                  <td className="px-4 py-2 text-xs text-gray-400 font-mono whitespace-nowrap">
-                    {formatTimestamp(log.timestamp)}
-                  </td>
-                  <td className="px-4 py-2 text-xs text-gray-300 truncate max-w-[144px]">
-                    {log.service_name}
-                  </td>
-                  <td className="px-4 py-2">
-                    <SeverityBadge severity={log.severity} />
-                  </td>
-                  <td className="px-4 py-2 text-xs text-gray-300 truncate max-w-md">
-                    {log.message}
-                  </td>
+          <>
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-surface-card border-b border-surface-border">
+                <tr>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase tracking-wider w-44">
+                    Timestamp
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase tracking-wider w-36">
+                    Service
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase tracking-wider w-24">
+                    Severity
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    Message
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-surface-border">
+                {displayedLogs.map((log) => (
+                  <tr
+                    key={log.id}
+                    onClick={() => setSelectedLog(log)}
+                    className="hover:bg-surface-card/50 cursor-pointer transition-colors"
+                  >
+                    <td className="px-4 py-2 text-xs text-gray-400 font-mono whitespace-nowrap">
+                      {formatTimestamp(log.timestamp)}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-gray-300 truncate max-w-[144px]">
+                      {log.service_name}
+                    </td>
+                    <td className="px-4 py-2">
+                      <SeverityBadge severity={log.severity} />
+                    </td>
+                    <td className="px-4 py-2 text-xs text-gray-300 truncate max-w-md">
+                      {log.message}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {hasMore && (
+              <div
+                ref={infiniteLoaderRef}
+                data-testid="logs-infinite-loader"
+                className="flex min-h-14 items-center justify-center py-4"
+                aria-live="polite"
+              >
+                {loadingMore && <div className="text-sm text-gray-400">Loading more logs...</div>}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Load more button */}
-      {hasMore && !loading && (
-        <div className="flex justify-center py-4">
-          <button
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="px-4 py-2 text-sm font-medium bg-surface-card border border-surface-border rounded text-gray-300 hover:text-white hover:bg-surface-border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loadingMore ? 'Loading...' : 'Load More'}
-          </button>
-        </div>
-      )}
-
       {/* Detail Drawer */}
-      {selectedLog && (
-        <LogDetailDrawer log={selectedLog} onClose={() => setSelectedLog(null)} />
-      )}
+      {selectedLog && <LogDetailDrawer log={selectedLog} onClose={() => setSelectedLog(null)} />}
     </div>
   );
 }
@@ -445,10 +474,7 @@ function LogDetailDrawer({ log, onClose }: { log: LogEntry; onClose: () => void 
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 z-40"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
       {/* Drawer */}
       <div className="fixed top-0 right-0 h-full w-[500px] max-w-[90vw] bg-surface-card border-l border-surface-border z-50 flex flex-col shadow-2xl animate-slide-in">
         {/* Header */}
@@ -488,15 +514,31 @@ function formatTimestamp(ts: string): string {
 
 function SearchIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+      />
     </svg>
   );
 }
 
 function CloseIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
     </svg>
   );
