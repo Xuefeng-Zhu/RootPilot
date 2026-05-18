@@ -34,7 +34,7 @@ export async function serviceMapQueryRoute(app: FastifyInstance): Promise<void> 
               AND project_id = $2
               AND ($3::text IS NULL OR environment = $3)
               AND ($4::timestamptz IS NULL OR last_seen_at >= $4)
-              AND ($5::timestamptz IS NULL OR first_seen_at <= $5)
+              AND ($5::timestamptz IS NULL OR last_seen_at <= $5)
             ORDER BY service_name ASC
           `,
           [tenantId, projectId, environment, from, to],

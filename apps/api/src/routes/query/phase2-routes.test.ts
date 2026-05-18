@@ -180,20 +180,22 @@ describe('Phase 2 query routes', () => {
   it('returns a tenant-scoped service map', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: '/v1/service-map?environment=production',
+      url: '/v1/service-map?environment=production&from=2026-05-18T11:00:00.000Z&to=2026-05-18T12:00:00.000Z',
       headers: { 'x-api-key': 'valid-key' },
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       nodes: [{ id: 'checkout-service', health_status: 'degraded' }],
-      edges: [{ source: 'checkout-service', target: 'payment-service' }],
+      edges: [{ environment: 'production', source: 'checkout-service', target: 'payment-service' }],
     });
     const serviceSummaryCall = mockPgQuery.mock.calls.find(([sql]) =>
       String(sql).includes('FROM service_summaries'),
     );
     expect(serviceSummaryCall?.[1]).toContain('tenant-1');
     expect(serviceSummaryCall?.[1]).toContain('project-1');
+    expect(String(serviceSummaryCall?.[0])).toContain('last_seen_at <= $5');
+    expect(String(serviceSummaryCall?.[0])).not.toContain('first_seen_at <= $5');
   });
 
   it('returns service details and dependencies', async () => {

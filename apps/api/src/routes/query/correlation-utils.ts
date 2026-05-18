@@ -173,7 +173,8 @@ export function mapServiceMapNode(row: ServiceSummaryRow): ServiceMapNode {
 
 export function mapServiceMapEdge(row: ServiceDependencyRow): ServiceMapEdge {
   return {
-    id: `${row.source_service}->${row.target_service}:${row.operation_name}`,
+    id: `${row.environment}:${row.source_service}->${row.target_service}:${row.operation_name}`,
+    environment: row.environment,
     source: row.source_service,
     target: row.target_service,
     operation_name: row.operation_name,

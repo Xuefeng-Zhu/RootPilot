@@ -197,6 +197,7 @@ export interface ServiceDependency {
 
 export interface ServiceMapEdge {
   id: string;
+  environment: string;
   source: string;
   target: string;
   operation_name: string;

@@ -56,7 +56,8 @@ export default function ServiceMapPage() {
   );
   const positionedNodes = useMemo(() => positionNodes(nodes), [nodes]);
   const nodeById = useMemo(
-    () => new Map(positionedNodes.map((node) => [node.id, node])),
+    () =>
+      new Map(positionedNodes.map((node) => [serviceNodeKey(node.name, node.environment), node])),
     [positionedNodes],
   );
 
@@ -141,8 +142,8 @@ export default function ServiceMapPage() {
                 </defs>
 
                 {edges.map((edge) => {
-                  const source = nodeById.get(edge.source);
-                  const target = nodeById.get(edge.target);
+                  const source = nodeById.get(serviceNodeKey(edge.source, edge.environment));
+                  const target = nodeById.get(serviceNodeKey(edge.target, edge.environment));
                   if (!source || !target) return null;
                   const strokeWidth = Math.min(6, Math.max(1.5, edge.call_count / 40));
                   const hasErrors = edge.error_count > 0 || edge.p95_duration_ms >= 500;
@@ -270,7 +271,9 @@ export default function ServiceMapPage() {
                     <p className="text-white font-medium">
                       {selectedEdge.source} {'->'} {selectedEdge.target}
                     </p>
-                    <p className="text-gray-400">{selectedEdge.operation_name}</p>
+                    <p className="text-gray-400">
+                      {selectedEdge.operation_name} · {selectedEdge.environment}
+                    </p>
                   </div>
                   <MetricRow label="Calls" value={formatNumber(selectedEdge.call_count)} />
                   <MetricRow label="Errors" value={formatNumber(selectedEdge.error_count)} />
@@ -332,13 +335,17 @@ function positionNodes(nodes: ServiceMapNode[]): PositionedNode[] {
     const x = 130 + column * 280;
     const gap = HEIGHT / (columnNodes.length + 1);
     return columnNodes
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .sort((a, b) => a.name.localeCompare(b.name) || a.environment.localeCompare(b.environment))
       .map((node, index) => ({
         ...node,
         x,
         y: gap * (index + 1),
       }));
   });
+}
+
+function serviceNodeKey(serviceName: string, environment: string): string {
+  return `${environment}:${serviceName}`;
 }
 
 function rangeToParams(range: TimeRange): { from: string; to: string } {
