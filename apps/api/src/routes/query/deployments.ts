@@ -1,9 +1,7 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { authMiddleware } from '../../middleware/auth.js';
 import { getClickHouseClient } from '../../db/clickhouse.js';
-import type {
-  DeploymentListResponse,
-} from '@rootpilot/shared';
+import type { DeploymentListResponse } from '@rootpilot/shared';
 import type { CanonicalDeploymentEvent, DecodedCursor } from '@rootpilot/shared';
 
 /**
@@ -38,6 +36,13 @@ function isValidISO8601(value: string): boolean {
   return !isNaN(date.getTime());
 }
 
+function toClickHouseDateTime(value: string): string {
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) {
+    return new Date(value).toISOString().replace('T', ' ').replace(/Z$/, '');
+  }
+  return value.replace('T', ' ').replace(/Z$/, '');
+}
+
 interface DeploymentsQuerystring {
   from?: string;
   to?: string;
@@ -70,8 +75,7 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
           return reply.status(400).send({
             error: {
               code: 'INVALID_PARAMETER',
-              message:
-                'Invalid limit parameter: must be a number between 1 and 200',
+              message: 'Invalid limit parameter: must be a number between 1 and 200',
             },
           });
         }
@@ -83,8 +87,7 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
         return reply.status(400).send({
           error: {
             code: 'INVALID_PARAMETER',
-            message:
-              'Invalid from parameter: must be a valid ISO 8601 timestamp',
+            message: 'Invalid from parameter: must be a valid ISO 8601 timestamp',
           },
         });
       }
@@ -93,8 +96,7 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
         return reply.status(400).send({
           error: {
             code: 'INVALID_PARAMETER',
-            message:
-              'Invalid to parameter: must be a valid ISO 8601 timestamp',
+            message: 'Invalid to parameter: must be a valid ISO 8601 timestamp',
           },
         });
       }
@@ -118,13 +120,13 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
       const queryParams: Record<string, unknown> = { tenantId };
 
       if (params.from) {
-        conditions.push('timestamp >= {from:String}');
-        queryParams.from = params.from;
+        conditions.push('timestamp >= {from:DateTime64(3)}');
+        queryParams.from = toClickHouseDateTime(params.from);
       }
 
       if (params.to) {
-        conditions.push('timestamp <= {to:String}');
-        queryParams.to = params.to;
+        conditions.push('timestamp <= {to:DateTime64(3)}');
+        queryParams.to = toClickHouseDateTime(params.to);
       }
 
       if (params.service) {
@@ -140,9 +142,9 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
       // Cursor-based pagination: fetch records older than the cursor
       if (cursorData) {
         conditions.push(
-          '(timestamp < {cursorTs:String} OR (timestamp = {cursorTs:String} AND deployment_id < {cursorId:String}))'
+          '(timestamp < {cursorTs:DateTime64(3)} OR (timestamp = {cursorTs:DateTime64(3)} AND deployment_id < {cursorId:String}))',
         );
-        queryParams.cursorTs = cursorData.ts;
+        queryParams.cursorTs = toClickHouseDateTime(cursorData.ts);
         queryParams.cursorId = cursorData.id;
       }
 
@@ -221,7 +223,7 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
       };
 
       return reply.status(200).send(response);
-    }
+    },
   );
 }
 

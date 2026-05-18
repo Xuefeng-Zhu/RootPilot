@@ -889,12 +889,16 @@ describe('Property 8: Query Filtering Correctness', () => {
           expect(queryParams.environment).toBe(filters.environment);
         }
         if (filters.from) {
-          expect(queryText).toContain('timestamp >= {from:String}');
-          expect(queryParams.from).toBe(filters.from);
+          expect(queryText).toContain('timestamp >= {from:DateTime64(3)}');
+          expect(queryParams.from).toBe(
+            new Date(filters.from).toISOString().replace('T', ' ').replace(/Z$/, '')
+          );
         }
         if (filters.to) {
-          expect(queryText).toContain('timestamp <= {to:String}');
-          expect(queryParams.to).toBe(filters.to);
+          expect(queryText).toContain('timestamp <= {to:DateTime64(3)}');
+          expect(queryParams.to).toBe(
+            new Date(filters.to).toISOString().replace('T', ' ').replace(/Z$/, '')
+          );
         }
       }),
       { numRuns: 100 }
