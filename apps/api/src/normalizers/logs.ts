@@ -81,9 +81,7 @@ export function mapSeverityNumber(severityNumber?: number): LogSeverity {
 /**
  * Converts OTLP attribute array to a flat Record<string, string>.
  */
-export function flattenAttributes(
-  attributes?: OTLPAttribute[]
-): Record<string, string> {
+export function flattenAttributes(attributes?: OTLPAttribute[]): Record<string, string> {
   if (!attributes || !Array.isArray(attributes)) {
     return {};
   }
@@ -129,18 +127,15 @@ export function nanoToISO(timeUnixNano?: string): string | null {
 export function normalizeLogRecords(
   resourceLogs: OTLPResourceLogs[],
   tenantId: string,
-  projectId: string
+  projectId: string,
 ): CanonicalLog[] {
   const receivedAt = new Date().toISOString();
   const results: CanonicalLog[] = [];
 
   for (const resourceLog of resourceLogs) {
-    const resourceAttributes = flattenAttributes(
-      resourceLog.resource?.attributes
-    );
+    const resourceAttributes = flattenAttributes(resourceLog.resource?.attributes);
     const serviceName = resourceAttributes['service.name'] || '';
-    const environment =
-      resourceAttributes['deployment.environment'] || '';
+    const environment = resourceAttributes['deployment.environment'] || '';
 
     const scopeLogs = resourceLog.scopeLogs || [];
 
@@ -148,8 +143,7 @@ export function normalizeLogRecords(
       const logRecords = scopeLog.logRecords || [];
 
       for (const logRecord of logRecords) {
-        const timestamp =
-          nanoToISO(logRecord.timeUnixNano) || receivedAt;
+        const timestamp = nanoToISO(logRecord.timeUnixNano) || receivedAt;
 
         const severity = mapSeverityNumber(logRecord.severityNumber);
         const message = logRecord.body?.stringValue || '';

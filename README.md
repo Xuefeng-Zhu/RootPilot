@@ -1,9 +1,10 @@
 # RootPilot
 
-RootPilot is a Phase 1 OpenTelemetry-native observability app. It provides a
+RootPilot is an OpenTelemetry-native observability app. It provides a
 Fastify API for telemetry ingestion/querying, ClickHouse storage for logs,
 spans, metrics, and deployment events, Postgres metadata for tenants/projects/API
-keys, and a Next.js UI for exploring the data.
+keys, and a Next.js UI for exploring service health, service maps, deployments,
+error groups, logs, traces, and metrics.
 
 ## Quick Start
 
@@ -11,6 +12,7 @@ keys, and a Next.js UI for exploring the data.
 npm ci
 docker compose -f infra/docker-compose.yml up -d postgres clickhouse
 npm run db:init
+npm run db:migrate
 npm run dev --workspace=apps/api
 npm run dev --workspace=apps/web
 ```
@@ -20,6 +22,7 @@ In another terminal, after the API is running:
 ```bash
 npm run seed
 npm run simulate -- --once
+npm run correlations:refresh -- --from now-2h --to now
 ```
 
 Open `http://localhost:3000`.
@@ -33,6 +36,8 @@ npm run build --workspace=apps/api
 npm run build --workspace=apps/web
 npm run build --workspace=apps/simulator
 npm run typecheck --workspace=packages/shared
+npm run simulate:bad-deploy -- --duration 10m --rate 30
+npm run correlations:refresh -- --from now-2h --to now
 ```
 
 ## Documentation
@@ -42,6 +47,9 @@ npm run typecheck --workspace=packages/shared
 - Development setup: `docs/development.md`
 - Local API examples: `docs/local-development.md`
 - Telemetry simulator: `docs/simulator.md`
+- Service graph and correlation ADR: `docs/adr/0002-service-graph-correlation-layer.md`
+- Service graph: `docs/service-graph.md`
+- Correlation: `docs/correlation.md`
 - Testing: `docs/testing.md`
 - Security: `docs/security.md`
 - Release notes: `docs/release.md`
@@ -49,7 +57,7 @@ npm run typecheck --workspace=packages/shared
 - Contributing: `docs/contributing.md`
 - Product overview: `docs/product-overview.md`
 - Agent workflow: `docs/agent-workflow.md`
-- Phase 1 scope: `docs/phase-1.md`
+- Phase 1 observability core ADR: `docs/adr/0001-observability-core-scope.md`
 
 ## Current Limitations
 

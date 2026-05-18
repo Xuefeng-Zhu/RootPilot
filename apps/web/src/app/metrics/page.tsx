@@ -86,8 +86,7 @@ function LineChart({ data }: { data: MetricDataPoint[] }) {
   const valueRange = maxValue - minValue || 1;
   const timeRange = maxTime - minTime || 1;
 
-  const scaleX = (t: number) =>
-    padding.left + ((t - minTime) / timeRange) * chartWidth;
+  const scaleX = (t: number) => padding.left + ((t - minTime) / timeRange) * chartWidth;
   const scaleY = (v: number) =>
     padding.top + chartHeight - ((v - minValue) / valueRange) * chartHeight;
 
@@ -323,11 +322,10 @@ export default function MetricsExplorerPage() {
           timestamp: point.timestamp,
           value: point.value,
           labels: {},
-        }))
+        })),
       );
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to fetch metric data';
+      const message = err instanceof Error ? err.message : 'Failed to fetch metric data';
       setError(message);
       setChartData([]);
       setTableData([]);
@@ -349,10 +347,7 @@ export default function MetricsExplorerPage() {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowMetricDropdown(false);
       }
     }
@@ -363,7 +358,7 @@ export default function MetricsExplorerPage() {
   // ─── Filtered metric names for dropdown ────────────────────────────
 
   const filteredMetrics = availableMetrics.filter((name) =>
-    name.toLowerCase().includes(metricSearch.toLowerCase())
+    name.toLowerCase().includes(metricSearch.toLowerCase()),
   );
 
   // ─── Format timestamp for display ─────────────────────────────────
@@ -411,9 +406,7 @@ export default function MetricsExplorerPage() {
             >
               {filteredMetrics.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-gray-500">
-                  {availableMetrics.length === 0
-                    ? 'No metrics available'
-                    : 'No matching metrics'}
+                  {availableMetrics.length === 0 ? 'No metrics available' : 'No matching metrics'}
                 </div>
               ) : (
                 filteredMetrics.map((name) => (
@@ -499,12 +492,7 @@ export default function MetricsExplorerPage() {
       {/* Loading State */}
       {loading && (
         <div className="flex items-center gap-2 text-gray-400 text-sm" aria-live="polite">
-          <svg
-            className="animate-spin h-4 w-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            aria-hidden="true"
-          >
+          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <circle
               className="opacity-25"
               cx="12"
@@ -525,7 +513,10 @@ export default function MetricsExplorerPage() {
 
       {/* Error State */}
       {error && (
-        <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-sm text-red-300" role="alert">
+        <div
+          className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-sm text-red-300"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -547,9 +538,7 @@ export default function MetricsExplorerPage() {
               d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"
             />
           </svg>
-          <p className="mt-4 text-gray-400">
-            Select a metric to visualize time-series data
-          </p>
+          <p className="mt-4 text-gray-400">Select a metric to visualize time-series data</p>
           <p className="mt-1 text-xs text-gray-500">
             Use the search dropdown above to find and select a metric name
           </p>
@@ -573,12 +562,8 @@ export default function MetricsExplorerPage() {
               d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"
             />
           </svg>
-          <p className="mt-4 text-gray-400">
-            No data available for the current selection
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            Try adjusting the time range or filters
-          </p>
+          <p className="mt-4 text-gray-400">No data available for the current selection</p>
+          <p className="mt-1 text-xs text-gray-500">Try adjusting the time range or filters</p>
         </div>
       )}
 
@@ -586,15 +571,11 @@ export default function MetricsExplorerPage() {
       {!loading && !error && chartData.length > 0 && (
         <div className="bg-surface-card border border-surface-border rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-gray-300">
-              {selectedMetric}
-            </h2>
+            <h2 className="text-sm font-medium text-gray-300">{selectedMetric}</h2>
             <span className="text-xs text-gray-500">
               Interval:{' '}
-              {getAutoInterval(
-                TIME_RANGES.find((r) => r.value === timeRange)?.ms ?? 3600000
-              )}{' '}
-              | Aggregation: avg
+              {getAutoInterval(TIME_RANGES.find((r) => r.value === timeRange)?.ms ?? 3600000)} |
+              Aggregation: avg
             </span>
           </div>
           <LineChart data={chartData} />
@@ -616,15 +597,9 @@ export default function MetricsExplorerPage() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-surface-card">
                 <tr className="border-b border-surface-border">
-                  <th className="text-left px-4 py-2 text-gray-400 font-medium">
-                    Timestamp
-                  </th>
-                  <th className="text-left px-4 py-2 text-gray-400 font-medium">
-                    Value
-                  </th>
-                  <th className="text-left px-4 py-2 text-gray-400 font-medium">
-                    Labels
-                  </th>
+                  <th className="text-left px-4 py-2 text-gray-400 font-medium">Timestamp</th>
+                  <th className="text-left px-4 py-2 text-gray-400 font-medium">Value</th>
+                  <th className="text-left px-4 py-2 text-gray-400 font-medium">Labels</th>
                 </tr>
               </thead>
               <tbody>
@@ -636,9 +611,7 @@ export default function MetricsExplorerPage() {
                     <td className="px-4 py-2 text-gray-300 font-mono text-xs">
                       {formatTimestamp(row.timestamp)}
                     </td>
-                    <td className="px-4 py-2 text-white font-mono">
-                      {row.value.toFixed(2)}
-                    </td>
+                    <td className="px-4 py-2 text-white font-mono">{row.value.toFixed(2)}</td>
                     <td className="px-4 py-2 text-gray-400 text-xs">
                       {Object.keys(row.labels).length > 0
                         ? Object.entries(row.labels)

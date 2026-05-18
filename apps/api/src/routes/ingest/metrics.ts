@@ -1,6 +1,7 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authMiddleware } from '../../middleware/auth.js';
-import { normalizeMetrics, OTLPResourceMetrics } from '../../normalizers/metrics.js';
+import type { OTLPResourceMetrics } from '../../normalizers/metrics.js';
+import { normalizeMetrics } from '../../normalizers/metrics.js';
 import { getClickHouseClient } from '../../db/clickhouse.js';
 
 /**
@@ -89,7 +90,7 @@ function validateDataPoints(
   metric: Record<string, unknown>,
   _i: number,
   _j: number,
-  _k: number
+  _k: number,
 ): string | null {
   const metricName = metric.name as string;
 
@@ -218,6 +219,6 @@ export async function metricsIngestRoute(app: FastifyInstance): Promise<void> {
       }
 
       return reply.status(202).send({ accepted: true });
-    }
+    },
   );
 }

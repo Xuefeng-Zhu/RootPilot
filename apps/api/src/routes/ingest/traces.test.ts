@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../server.js';
 
 // Mock the postgres module for auth
@@ -53,9 +53,7 @@ function validTracePayload() {
     resourceSpans: [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'test-service' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'test-service' } }],
         },
         scopeSpans: [
           {
@@ -524,7 +522,7 @@ describe('POST /v1/ingest/traces', () => {
             span_id: 'span001',
             operation_name: 'GET /api/users',
           }),
-        ])
+        ]),
       );
     });
 
@@ -533,9 +531,7 @@ describe('POST /v1/ingest/traces', () => {
         resourceSpans: [
           {
             resource: {
-              attributes: [
-                { key: 'service.name', value: { stringValue: 'svc-a' } },
-              ],
+              attributes: [{ key: 'service.name', value: { stringValue: 'svc-a' } }],
             },
             scopeSpans: [
               {

@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { v4 as uuidv4 } from 'uuid';
 import { getClickHouseClient } from '../../db/clickhouse.js';
 import { authMiddleware } from '../../middleware/auth.js';
@@ -28,7 +28,8 @@ export async function deploymentIngestRoutes(app: FastifyInstance): Promise<void
         return reply.status(400).send({
           error: {
             code: 'INVALID_PAYLOAD',
-            message: 'Request body must be a valid JSON object with required fields: service_name, environment, version',
+            message:
+              'Request body must be a valid JSON object with required fields: service_name, environment, version',
           },
         });
       }
@@ -38,15 +39,27 @@ export async function deploymentIngestRoutes(app: FastifyInstance): Promise<void
       // Validate required fields
       const missingFields: string[] = [];
 
-      if (!payload.service_name || typeof payload.service_name !== 'string' || payload.service_name.trim() === '') {
+      if (
+        !payload.service_name ||
+        typeof payload.service_name !== 'string' ||
+        payload.service_name.trim() === ''
+      ) {
         missingFields.push('service_name');
       }
 
-      if (!payload.environment || typeof payload.environment !== 'string' || payload.environment.trim() === '') {
+      if (
+        !payload.environment ||
+        typeof payload.environment !== 'string' ||
+        payload.environment.trim() === ''
+      ) {
         missingFields.push('environment');
       }
 
-      if (!payload.version || typeof payload.version !== 'string' || payload.version.trim() === '') {
+      if (
+        !payload.version ||
+        typeof payload.version !== 'string' ||
+        payload.version.trim() === ''
+      ) {
         missingFields.push('version');
       }
 
@@ -94,6 +107,6 @@ export async function deploymentIngestRoutes(app: FastifyInstance): Promise<void
       await clickhouse.batchInsert('deployment_events', [deploymentEvent]);
 
       return reply.status(202).send({ status: 'accepted' });
-    }
+    },
   );
 }

@@ -12,77 +12,80 @@ const mockApiClient = vi.mocked(apiClient);
 
 const mockServices = [
   {
+    id: 'summary-1',
     service_name: 'checkout-service',
     environment: 'production',
+    first_seen_at: '2026-05-18T11:00:00.000Z',
+    last_seen_at: '2026-05-18T12:00:00.000Z',
     last_seen: '2026-05-18T12:00:00.000Z',
+    source_signals: { logs: true, traces: true, metrics: true, deployments: true },
+    latest_version: 'v1.4.2',
+    latest_deployment_id: 'deploy-1',
+    request_count: 100,
+    error_count: 14,
     log_count: 10,
     span_count: 10,
     metric_count: 8,
+    deployment_count: 1,
+    dependency_count: 3,
+    avg_latency_ms: 182,
+    p95_latency_ms: 842,
+    health_status: 'degraded',
+    updated_at: '2026-05-18T12:00:00.000Z',
   },
   {
+    id: 'summary-2',
     service_name: 'auth-service',
     environment: 'staging',
+    first_seen_at: '2026-05-18T11:00:00.000Z',
+    last_seen_at: '2026-05-18T11:55:00.000Z',
     last_seen: '2026-05-18T11:55:00.000Z',
+    source_signals: { logs: true, traces: true, metrics: true, deployments: false },
+    latest_version: null,
+    latest_deployment_id: null,
+    request_count: 90,
+    error_count: 0,
     log_count: 120,
     span_count: 90,
     metric_count: 30,
+    deployment_count: 0,
+    dependency_count: 1,
+    avg_latency_ms: 40,
+    p95_latency_ms: 90,
+    health_status: 'healthy',
+    updated_at: '2026-05-18T11:55:00.000Z',
   },
   {
+    id: 'summary-3',
     service_name: 'search-service',
     environment: 'production',
+    first_seen_at: '2026-05-18T11:00:00.000Z',
+    last_seen_at: '2026-05-18T11:50:00.000Z',
     last_seen: '2026-05-18T11:50:00.000Z',
+    source_signals: { logs: true, traces: true, metrics: true, deployments: false },
+    latest_version: null,
+    latest_deployment_id: null,
+    request_count: 40,
+    error_count: 1,
     log_count: 75,
     span_count: 40,
     metric_count: 18,
+    deployment_count: 0,
+    dependency_count: 2,
+    avg_latency_ms: 120,
+    p95_latency_ms: 260,
+    health_status: 'warning',
+    updated_at: '2026-05-18T11:50:00.000Z',
   },
 ];
-
-function mockServiceCatalogApi() {
-  mockApiClient.mockImplementation(
-    async (path: string, options?: { params?: Record<string, unknown> }) => {
-      if (path === '/v1/services') {
-        return { data: mockServices };
-      }
-      if (path === '/v1/logs' && options?.params?.severity === 'ERROR') {
-        return {
-          data: [{ id: 'error-log-1', severity: 'ERROR', service_name: 'checkout-service' }],
-          pagination: { cursor: null, hasMore: false },
-        };
-      }
-      if (path === '/v1/logs' && options?.params?.severity === 'FATAL') {
-        return {
-          data: [{ id: 'fatal-log-1', severity: 'FATAL', service_name: 'checkout-service' }],
-          pagination: { cursor: null, hasMore: false },
-        };
-      }
-      if (path === '/v1/traces') {
-        return {
-          data: [
-            {
-              trace_id: 'trace-1',
-              root_service: 'checkout-service',
-              root_operation: 'POST /api/checkout',
-              duration_ms: 100,
-              span_count: 5,
-              status: 'ERROR',
-              timestamp: '2026-05-18T12:00:00.000Z',
-            },
-          ],
-          pagination: { cursor: null, hasMore: false },
-        };
-      }
-      return { data: [] };
-    },
-  );
-}
 
 describe('ServicesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockServiceCatalogApi();
+    mockApiClient.mockResolvedValue({ data: mockServices });
   });
 
-  it('renders service catalog filters and service rows', async () => {
+  it('renders service catalog filters and enriched service rows', async () => {
     render(<ServicesPage />);
 
     await waitFor(() => {
@@ -95,6 +98,7 @@ describe('ServicesPage', () => {
     expect(screen.getByText('3 of 3 services')).toBeInTheDocument();
     expect(screen.getByText('auth-service')).toBeInTheDocument();
     expect(screen.getByText('search-service')).toBeInTheDocument();
+    expect(screen.getByText('v1.4.2')).toBeInTheDocument();
   });
 
   it('filters services by name', async () => {
@@ -136,7 +140,7 @@ describe('ServicesPage', () => {
     expect(screen.getByText('3 of 3 services')).toBeInTheDocument();
   });
 
-  it('filters services by computed health', async () => {
+  it('filters services by backend health status', async () => {
     render(<ServicesPage />);
 
     await waitFor(() => {
@@ -144,7 +148,7 @@ describe('ServicesPage', () => {
     });
 
     fireEvent.change(screen.getByLabelText('Filter services by health'), {
-      target: { value: 'Unhealthy' },
+      target: { value: 'degraded' },
     });
 
     expect(screen.getByText('checkout-service')).toBeInTheDocument();

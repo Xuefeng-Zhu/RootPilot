@@ -8,9 +8,15 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "test": "vitest run",
     "start": "node dist/index.js",
     "db:init": "tsx src/scripts/db-init.ts",
-    "seed": "tsx src/scripts/seed.ts"
+    "db:migrate": "tsx src/scripts/db-migrate.ts",
+    "seed": "tsx src/scripts/seed.ts",
+    "graph:build": "tsx src/scripts/correlation-refresh.ts --mode graph",
+    "error-groups:build": "tsx src/scripts/correlation-refresh.ts --mode error-groups",
+    "deployments:analyze": "tsx src/scripts/correlation-refresh.ts --mode deployments",
+    "correlations:refresh": "tsx src/scripts/correlation-refresh.ts --mode all"
   },
   "dependencies": {
     "@clickhouse/client": "^1.1.0",

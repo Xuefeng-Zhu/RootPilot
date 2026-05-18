@@ -22,7 +22,13 @@ const { Pool } = pg;
 const API_BASE_URL = process.env.API_URL ?? 'http://localhost:4000';
 const API_KEY = 'rootpilot_demo_key';
 
-const SERVICES = ['auth-service', 'api-gateway', 'payment-service', 'user-service', 'notification-service'];
+const SERVICES = [
+  'auth-service',
+  'api-gateway',
+  'payment-service',
+  'user-service',
+  'notification-service',
+];
 const ENVIRONMENTS = ['production', 'staging', 'development'];
 const SEVERITIES = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'];
 const SEVERITY_NUMBERS: Record<string, number> = {
@@ -155,10 +161,7 @@ async function setupDemoTenant(): Promise<void> {
     const keyPrefix = API_KEY.slice(0, 8);
 
     // Check if key already exists
-    const existingKey = await pool.query(
-      'SELECT id FROM api_keys WHERE key_hash = $1',
-      [keyHash],
-    );
+    const existingKey = await pool.query('SELECT id FROM api_keys WHERE key_hash = $1', [keyHash]);
 
     if (existingKey.rows.length === 0) {
       await pool.query(
@@ -196,8 +199,14 @@ async function seedLogs(): Promise<void> {
           severityText: severity,
           body: { stringValue: message },
           attributes: [
-            { key: 'http.method', value: { stringValue: randomChoice(['GET', 'POST', 'PUT', 'DELETE']) } },
-            { key: 'http.status_code', value: { intValue: randomChoice([200, 201, 400, 404, 500]) } },
+            {
+              key: 'http.method',
+              value: { stringValue: randomChoice(['GET', 'POST', 'PUT', 'DELETE']) },
+            },
+            {
+              key: 'http.status_code',
+              value: { intValue: randomChoice([200, 201, 400, 404, 500]) },
+            },
           ],
         });
       }
@@ -283,7 +292,10 @@ function generateTrace(service: string, env: string): unknown {
       status: { code: randomChoice([0, 1, 1, 2]) },
       attributes: [
         { key: 'peer.service', value: { stringValue: childService } },
-        { key: 'db.system', value: { stringValue: randomChoice(['postgresql', 'redis', 'elasticsearch']) } },
+        {
+          key: 'db.system',
+          value: { stringValue: randomChoice(['postgresql', 'redis', 'elasticsearch']) },
+        },
       ],
     });
 

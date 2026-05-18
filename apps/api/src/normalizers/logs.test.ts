@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  normalizeLogRecords,
-  mapSeverityNumber,
-  flattenAttributes,
-  nanoToISO,
-  OTLPResourceLogs,
-} from './logs';
+import type { OTLPResourceLogs } from './logs';
+import { normalizeLogRecords, mapSeverityNumber, flattenAttributes, nanoToISO } from './logs';
 
 describe('mapSeverityNumber', () => {
   it('maps 1-4 to TRACE', () => {
@@ -52,9 +47,7 @@ describe('mapSeverityNumber', () => {
 
 describe('flattenAttributes', () => {
   it('flattens string attributes', () => {
-    const attrs = [
-      { key: 'service.name', value: { stringValue: 'my-service' } },
-    ];
+    const attrs = [{ key: 'service.name', value: { stringValue: 'my-service' } }];
     expect(flattenAttributes(attrs)).toEqual({ 'service.name': 'my-service' });
   });
 
@@ -136,9 +129,7 @@ describe('normalizeLogRecords', () => {
                 severityNumber: 9,
                 severityText: 'INFO',
                 body: { stringValue: 'User logged in' },
-                attributes: [
-                  { key: 'user.id', value: { stringValue: 'user-1' } },
-                ],
+                attributes: [{ key: 'user.id', value: { stringValue: 'user-1' } }],
                 traceId: 'trace-abc',
                 spanId: 'span-def',
               },
@@ -168,9 +159,7 @@ describe('normalizeLogRecords', () => {
       'deployment.environment': 'production',
     });
     expect(log.fingerprint).toBe('');
-    expect(log.id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-    );
+    expect(log.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(log.timestamp).toBe('2024-06-15T10:00:00.000Z');
     expect(log.received_at).toBe('2024-06-15T10:00:00.000Z');
   });
@@ -224,9 +213,7 @@ describe('normalizeLogRecords', () => {
     const resourceLogs: OTLPResourceLogs[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc-a' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc-a' } }],
         },
         scopeLogs: [
           {
@@ -247,9 +234,7 @@ describe('normalizeLogRecords', () => {
       },
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc-b' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc-b' } }],
         },
         scopeLogs: [
           {

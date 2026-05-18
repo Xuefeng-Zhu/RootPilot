@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import { query } from '../db/postgres.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -38,10 +38,7 @@ export function hashApiKey(key: string): string {
  * 5. Returns 401 AUTH_REVOKED if revoked_at is not null
  * 6. Attaches TenantContext to the request
  */
-export async function authMiddleware(
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
+export async function authMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const apiKey = request.headers['x-api-key'];
 
   // Check for missing or empty key
@@ -75,10 +72,7 @@ export async function authMiddleware(
     id: string;
     tenant_id: string;
     revoked_at: string | null;
-  }>(
-    'SELECT id, tenant_id, revoked_at FROM api_keys WHERE key_hash = $1',
-    [keyHash]
-  );
+  }>('SELECT id, tenant_id, revoked_at FROM api_keys WHERE key_hash = $1', [keyHash]);
 
   // No matching key found
   if (apiKeyResult.rows.length === 0) {
@@ -107,7 +101,7 @@ export async function authMiddleware(
   // Look up the project for this tenant
   const projectResult = await query<{ id: string }>(
     'SELECT id FROM projects WHERE tenant_id = $1 LIMIT 1',
-    [apiKeyRecord.tenant_id]
+    [apiKeyRecord.tenant_id],
   );
 
   const projectId = projectResult.rows.length > 0 ? projectResult.rows[0].id : '';

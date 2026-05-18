@@ -25,7 +25,7 @@ const pool = new Pool({
  */
 export async function query<T = Record<string, unknown>>(
   text: string,
-  params?: unknown[]
+  params?: unknown[],
 ): Promise<QueryResult<T>> {
   const result = await pool.query(text, params);
   return { rows: result.rows as T[], rowCount: result.rowCount };

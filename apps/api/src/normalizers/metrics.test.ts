@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeMetrics, OTLPResourceMetrics } from './metrics';
+import type { OTLPResourceMetrics } from './metrics';
+import { normalizeMetrics } from './metrics';
 
 describe('normalizeMetrics', () => {
   const tenantId = 'tenant-123';
@@ -26,9 +27,7 @@ describe('normalizeMetrics', () => {
                     {
                       timeUnixNano: '1700000000000000000',
                       asDouble: 42.5,
-                      attributes: [
-                        { key: 'http.method', value: { stringValue: 'GET' } },
-                      ],
+                      attributes: [{ key: 'http.method', value: { stringValue: 'GET' } }],
                     },
                   ],
                 },
@@ -64,9 +63,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'worker' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'worker' } }],
         },
         scopeMetrics: [
           {
@@ -100,9 +97,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'api-server' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'api-server' } }],
         },
         scopeMetrics: [
           {
@@ -115,9 +110,7 @@ describe('normalizeMetrics', () => {
                     {
                       timeUnixNano: '1700000000000000000',
                       asInt: '1024',
-                      attributes: [
-                        { key: 'http.status_code', value: { intValue: '200' } },
-                      ],
+                      attributes: [{ key: 'http.status_code', value: { intValue: '200' } }],
                     },
                   ],
                   isMonotonic: true,
@@ -143,9 +136,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'api-server' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'api-server' } }],
         },
         scopeMetrics: [
           {
@@ -159,9 +150,7 @@ describe('normalizeMetrics', () => {
                       timeUnixNano: '1700000000000000000',
                       count: '10',
                       sum: 500,
-                      attributes: [
-                        { key: 'http.method', value: { stringValue: 'POST' } },
-                      ],
+                      attributes: [{ key: 'http.method', value: { stringValue: 'POST' } }],
                     },
                   ],
                 },
@@ -184,9 +173,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {
@@ -219,9 +206,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {
@@ -246,9 +231,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {
@@ -279,9 +262,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {
@@ -315,9 +296,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {
@@ -353,9 +332,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'service-a' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'service-a' } }],
         },
         scopeMetrics: [
           {
@@ -372,9 +349,7 @@ describe('normalizeMetrics', () => {
       },
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'service-b' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'service-b' } }],
         },
         scopeMetrics: [
           {
@@ -428,9 +403,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {
@@ -462,9 +435,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {
@@ -493,9 +464,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {
@@ -520,7 +489,7 @@ describe('normalizeMetrics', () => {
     expect(result[0].id).not.toBe(result[1].id);
     // UUID v4 format
     expect(result[0].id).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
   });
 
@@ -528,9 +497,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {
@@ -567,9 +534,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [],
       },
@@ -583,9 +548,7 @@ describe('normalizeMetrics', () => {
     const input: OTLPResourceMetrics[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'svc' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'svc' } }],
         },
         scopeMetrics: [
           {

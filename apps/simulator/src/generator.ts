@@ -18,7 +18,8 @@ import type {
 interface RequestPattern {
   method: string;
   route: string;
-  kind: 'checkout' | 'products' | 'search' | 'recommendations';
+  kind: 'checkout' | 'products' | 'search' | 'recommendations' | 'notification';
+  entryService: ServiceName;
 }
 
 interface SpanStep {
@@ -35,10 +36,21 @@ interface SpanStep {
 }
 
 const REQUEST_PATTERNS: RequestPattern[] = [
-  { method: 'GET', route: '/api/products', kind: 'products' },
-  { method: 'POST', route: '/api/checkout', kind: 'checkout' },
-  { method: 'GET', route: '/api/search', kind: 'search' },
-  { method: 'GET', route: '/api/recommendations', kind: 'recommendations' },
+  { method: 'GET', route: '/api/products', kind: 'products', entryService: 'api-gateway' },
+  { method: 'POST', route: '/api/checkout', kind: 'checkout', entryService: 'api-gateway' },
+  { method: 'GET', route: '/api/search', kind: 'search', entryService: 'api-gateway' },
+  {
+    method: 'GET',
+    route: '/api/recommendations',
+    kind: 'recommendations',
+    entryService: 'api-gateway',
+  },
+  {
+    method: 'POST',
+    route: '/jobs/notifications/dispatch',
+    kind: 'notification',
+    entryService: 'notification-service',
+  },
 ];
 
 const ERROR_MESSAGE = 'PaymentProviderTimeout: timeout exceeded after 500ms';
@@ -126,7 +138,7 @@ export class TelemetryGenerator {
     const rootSpan: SpanStep = {
       id: rootSpanId,
       parentId: '',
-      serviceName: 'api-gateway',
+      serviceName: pattern.entryService,
       operationName: `${pattern.method} ${pattern.route}`,
       kind: 'SERVER',
       offsetMs: 0,
@@ -166,6 +178,9 @@ export class TelemetryGenerator {
       }
       if (this.config.services.includes('inventory-service')) {
         return REQUEST_PATTERNS[0]!;
+      }
+      if (this.config.services.includes('notification-service')) {
+        return REQUEST_PATTERNS[4]!;
       }
     }
 
@@ -225,6 +240,9 @@ export class TelemetryGenerator {
         'recommendation.rank',
         context,
       );
+    }
+    if (pattern.kind === 'notification') {
+      return this.notificationSteps(rootSpanId, context);
     }
     return [
       this.step(
@@ -330,6 +348,13 @@ export class TelemetryGenerator {
         isWarning: cacheStorm || context.isWarning,
       }),
     ];
+  }
+
+  private notificationSteps(
+    rootSpanId: string,
+    context: ReturnType<TelemetryGenerator['scenarioContext']>,
+  ): SpanStep[] {
+    return [this.step(rootSpanId, 'kafka-broker', 'kafka.publish', 'PRODUCER', 16, 22, context)];
   }
 
   private step(

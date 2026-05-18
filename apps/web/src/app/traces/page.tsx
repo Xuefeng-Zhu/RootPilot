@@ -86,17 +86,14 @@ export default function TracesPage() {
         setCursor(response.pagination.cursor);
         setHasMore(response.pagination.hasMore);
       } catch (err) {
-        const message =
-          err instanceof ApiError
-            ? err.message
-            : 'Failed to fetch traces';
+        const message = err instanceof ApiError ? err.message : 'Failed to fetch traces';
         setError(message);
       } finally {
         setLoading(false);
         setLoadingMore(false);
       }
     },
-    [timeRange, service, minDuration]
+    [timeRange, service, minDuration],
   );
 
   useEffect(() => {
@@ -181,9 +178,7 @@ export default function TracesPage() {
       )}
 
       {/* Loading State */}
-      {loading && (
-        <div className="text-gray-400 text-sm py-8 text-center">Loading traces...</div>
-      )}
+      {loading && <div className="text-gray-400 text-sm py-8 text-center">Loading traces...</div>}
 
       {/* Empty State */}
       {!loading && !error && traces.length === 0 && (
@@ -227,9 +222,7 @@ export default function TracesPage() {
                     {formatDuration(trace.duration_ms)}
                   </td>
                   <td className="py-3 pr-4 text-gray-300">{trace.span_count}</td>
-                  <td className="py-3 text-gray-400 text-xs">
-                    {formatTimestamp(trace.timestamp)}
-                  </td>
+                  <td className="py-3 text-gray-400 text-xs">{formatTimestamp(trace.timestamp)}</td>
                 </tr>
               ))}
             </tbody>

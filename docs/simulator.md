@@ -55,6 +55,7 @@ npm run simulate -- --scenario database-degradation --duration 10m --rate 30
 npm run simulate -- --scenario cache-miss-storm --duration 10m --rate 30
 npm run simulate -- --scenario high-cardinality --duration 3m --rate 100
 npm run simulate -- --scenario multi-service --duration 15m --rate 40
+npm run simulate:graph
 npm run simulate -- --once
 npm run simulate:dry-run
 ```
@@ -135,9 +136,18 @@ After running a scenario, open the local web app and inspect:
 - Traces: slow/error traces and trace detail waterfalls.
 - Metrics: metric names and time-range aggregation.
 - Services: discovered service catalog and health indicators.
+- Service Map: inferred dependencies and edge health.
+- Error Groups: grouped failures and example trace links.
+- Deployments: deployment impact and before/after comparisons.
 
 For `bad-deploy`, look for version `v1.4.2`, the deployment event, and the log
 message `PaymentProviderTimeout: timeout exceeded after 500ms`.
+
+For graph and correlation pages, refresh aggregates after simulation:
+
+```bash
+npm run correlations:refresh -- --from now-2h --to now
+```
 
 ## Troubleshooting
 
@@ -168,16 +178,16 @@ npm run simulate -- --once --dry-run --verbose
 
 That prints the exact generated payloads without sending them.
 
-## Phase 1 And Future Evolution
+## Observability Core And Future Evolution
 
-For Phase 1, the simulator validates ingestion APIs, ClickHouse telemetry
-storage, Postgres-backed tenant/API-key auth, service discovery, UI filters, and
+The simulator validates ingestion APIs, ClickHouse telemetry storage,
+Postgres-backed tenant/API-key auth, service discovery, UI filters, and
 tenant-scoped query behavior.
 
-For Phase 2, the same scenario patterns can become deterministic AI
-investigation fixtures. The `bad-deploy`, `checkout-error`,
-`database-degradation`, and `cache-miss-storm` scenarios already produce
-correlated data that can support future root-cause workflows.
+The same scenario patterns populate service graph, error grouping, deployment
+impact, and timeline data. The `bad-deploy`, `checkout-error`,
+`database-degradation`, and `cache-miss-storm` scenarios produce correlated data
+that can later support AI root-cause workflows.
 
 RootPilot may later support full OTLP protobuf ingestion. At that point, tools
 such as OpenTelemetry `telemetrygen` and the OpenTelemetry Demo can complement

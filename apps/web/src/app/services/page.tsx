@@ -1,105 +1,26 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import type { ServiceSummary } from '@rootpilot/shared';
 import { apiClient } from '../../lib/api';
-
-interface Service {
-  service_name: string;
-  environment: string;
-  last_seen: string;
-  log_count: number;
-  span_count: number;
-  metric_count: number;
-}
+import {
+  formatMs,
+  formatNumber,
+  formatPercent,
+  formatTimestamp,
+  healthColor,
+  healthTextColor,
+} from '../../lib/format';
 
 interface ServicesResponse {
-  data: Service[];
+  data: ServiceSummary[];
 }
 
-interface LogEntry {
-  id: string;
-  severity: string;
-  service_name: string;
-}
-
-interface LogsResponse {
-  data: LogEntry[];
-  pagination: { cursor: string | null; hasMore: boolean };
-}
-
-interface TraceSummary {
-  trace_id: string;
-  root_service: string;
-  root_operation: string;
-  duration_ms: number;
-  span_count: number;
-  status: string;
-  timestamp: string;
-}
-
-interface TracesResponse {
-  data: TraceSummary[];
-  pagination: { cursor: string | null; hasMore: boolean };
-}
-
-interface HealthInfo {
-  label: string;
-  color: string;
-  errorRate: number | null;
-}
-
-interface ServiceWithHealth {
-  service: Service;
-  health: HealthInfo;
-}
-
-const HEALTH_FILTERS = ['Healthy', 'Degraded', 'Unhealthy', 'No Data'] as const;
-
-function computeHealth(
-  service: Service,
-  errorLogCounts: Map<string, number>,
-  errorSpanCounts: Map<string, number>,
-): HealthInfo {
-  const key = `${service.service_name}:${service.environment}`;
-  const errorLogs = errorLogCounts.get(key) ?? 0;
-  const errorSpans = errorSpanCounts.get(key) ?? 0;
-
-  const totalSignals = service.log_count + service.span_count;
-
-  if (totalSignals === 0) {
-    return { label: 'No Data', color: 'bg-gray-500', errorRate: null };
-  }
-
-  const totalErrors = errorLogs + errorSpans;
-  const errorRate = totalErrors / totalSignals;
-
-  if (errorRate >= 0.1) {
-    return { label: 'Unhealthy', color: 'bg-red-500', errorRate };
-  }
-  if (errorRate >= 0.01) {
-    return { label: 'Degraded', color: 'bg-yellow-500', errorRate };
-  }
-  return { label: 'Healthy', color: 'bg-green-500', errorRate };
-}
-
-function formatTimestamp(ts: string): string {
-  try {
-    const date = new Date(ts);
-    return date.toLocaleString();
-  } catch {
-    return ts;
-  }
-}
-
-function formatErrorRate(rate: number | null): string {
-  if (rate === null) return '—';
-  return `${(rate * 100).toFixed(1)}%`;
-}
+const HEALTH_FILTERS = ['healthy', 'warning', 'degraded', 'unknown'] as const;
 
 export default function ServicesPage() {
-  const [services, setServices] = useState<Service[]>([]);
-  const [errorLogCounts, setErrorLogCounts] = useState<Map<string, number>>(new Map());
-  const [errorSpanCounts, setErrorSpanCounts] = useState<Map<string, number>>(new Map());
+  const [services, setServices] = useState<ServiceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [serviceFilter, setServiceFilter] = useState('');
@@ -111,69 +32,8 @@ export default function ServicesPage() {
       try {
         setLoading(true);
         setError(null);
-
-        // Fetch services list
-        const servicesResponse = await apiClient<ServicesResponse>('/v1/services');
-        setServices(servicesResponse.data);
-
-        // Fetch recent error-severity logs to derive health indicator
-        const logCounts = new Map<string, number>();
-        const spanCounts = new Map<string, number>();
-
-        try {
-          // Get recent error logs (last 1h is the default)
-          const errorLogs = await apiClient<LogsResponse>('/v1/logs', {
-            params: { severity: 'ERROR', limit: 1000 },
-          });
-          for (const log of errorLogs.data) {
-            // Count by service_name across all environments
-            const currentCount = logCounts.get(log.service_name) ?? 0;
-            logCounts.set(log.service_name, currentCount + 1);
-          }
-
-          // Also count FATAL logs
-          const fatalLogs = await apiClient<LogsResponse>('/v1/logs', {
-            params: { severity: 'FATAL', limit: 1000 },
-          });
-          for (const log of fatalLogs.data) {
-            const currentCount = logCounts.get(log.service_name) ?? 0;
-            logCounts.set(log.service_name, currentCount + 1);
-          }
-        } catch {
-          // Non-critical: if log query fails, health indicator will use "No Data"
-        }
-
-        try {
-          // Get recent traces to check for ERROR status spans
-          const recentTraces = await apiClient<TracesResponse>('/v1/traces', {
-            params: { limit: 200 },
-          });
-          for (const trace of recentTraces.data) {
-            if (trace.status === 'ERROR') {
-              const currentCount = spanCounts.get(trace.root_service) ?? 0;
-              spanCounts.set(trace.root_service, currentCount + 1);
-            }
-          }
-        } catch {
-          // Non-critical: if trace query fails, health indicator will use log data only
-        }
-
-        // Map counts to service keys (service_name:environment)
-        const errorLogsByKey = new Map<string, number>();
-        const errorSpansByKey = new Map<string, number>();
-
-        for (const service of servicesResponse.data) {
-          const key = `${service.service_name}:${service.environment}`;
-          // Assign error logs to matching services
-          const logErrors = logCounts.get(service.service_name) ?? 0;
-          errorLogsByKey.set(key, logErrors);
-          // Assign error spans to matching services
-          const spanErrors = spanCounts.get(service.service_name) ?? 0;
-          errorSpansByKey.set(key, spanErrors);
-        }
-
-        setErrorLogCounts(errorLogsByKey);
-        setErrorSpanCounts(errorSpansByKey);
+        const response = await apiClient<ServicesResponse>('/v1/services');
+        setServices(response.data.map(normalizeServiceSummary));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch services');
       } finally {
@@ -183,15 +43,6 @@ export default function ServicesPage() {
     fetchServices();
   }, []);
 
-  const servicesWithHealth = useMemo<ServiceWithHealth[]>(
-    () =>
-      services.map((service) => ({
-        service,
-        health: computeHealth(service, errorLogCounts, errorSpanCounts),
-      })),
-    [errorLogCounts, errorSpanCounts, services],
-  );
-
   const environments = useMemo(
     () => [...new Set(services.map((service) => service.environment).filter(Boolean))].sort(),
     [services],
@@ -200,17 +51,17 @@ export default function ServicesPage() {
   const filteredServices = useMemo(() => {
     const normalizedServiceFilter = serviceFilter.trim().toLowerCase();
 
-    return servicesWithHealth.filter(({ service, health }) => {
+    return services.filter((service) => {
       const matchesService =
         normalizedServiceFilter.length === 0 ||
         service.service_name.toLowerCase().includes(normalizedServiceFilter);
       const matchesEnvironment =
         environmentFilter.length === 0 || service.environment === environmentFilter;
-      const matchesHealth = healthFilter.length === 0 || health.label === healthFilter;
+      const matchesHealth = healthFilter.length === 0 || service.health_status === healthFilter;
 
       return matchesService && matchesEnvironment && matchesHealth;
     });
-  }, [environmentFilter, healthFilter, serviceFilter, servicesWithHealth]);
+  }, [environmentFilter, healthFilter, serviceFilter, services]);
 
   const hasActiveFilters =
     serviceFilter.trim().length > 0 || environmentFilter.length > 0 || healthFilter.length > 0;
@@ -223,7 +74,20 @@ export default function ServicesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-6">Service Catalog</h1>
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Service Catalog</h1>
+          <p className="text-sm text-gray-400 mt-1">
+            Discovered services, health, dependencies, and recent deployment context.
+          </p>
+        </div>
+        <Link
+          href="/service-map"
+          className="px-3 py-2 text-sm bg-sidebar-active text-white rounded border border-sidebar-active hover:bg-sidebar-active/80"
+        >
+          Open Service Map
+        </Link>
+      </div>
 
       {loading && <div className="text-gray-400">Loading services...</div>}
 
@@ -237,7 +101,7 @@ export default function ServicesPage() {
         <div className="bg-surface-card border border-surface-border rounded-lg p-8 text-center">
           <p className="text-gray-400 text-lg">No services found</p>
           <p className="text-gray-500 text-sm mt-2">
-            Services will appear here once they start sending telemetry data.
+            Run the simulator and then `npm run correlations:refresh` to populate service summaries.
           </p>
         </div>
       )}
@@ -277,7 +141,7 @@ export default function ServicesPage() {
               <option value="">All Health</option>
               {HEALTH_FILTERS.map((healthLabel) => (
                 <option key={healthLabel} value={healthLabel}>
-                  {healthLabel}
+                  {titleCase(healthLabel)}
                 </option>
               ))}
             </select>
@@ -302,52 +166,77 @@ export default function ServicesPage() {
               <p className="text-gray-400 text-sm">No services match the current filters.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border border-surface-border rounded-lg">
               <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-400 uppercase border-b border-surface-border">
+                <thead className="text-xs text-gray-400 uppercase border-b border-surface-border bg-surface-card/60">
                   <tr>
-                    <th className="px-4 py-3">Service Name</th>
+                    <th className="px-4 py-3">Service</th>
                     <th className="px-4 py-3">Environment</th>
-                    <th className="px-4 py-3">Last Seen</th>
                     <th className="px-4 py-3">Health</th>
+                    <th className="px-4 py-3">Requests</th>
+                    <th className="px-4 py-3">Errors</th>
                     <th className="px-4 py-3">Error Rate</th>
-                    <th className="px-4 py-3">Logs</th>
-                    <th className="px-4 py-3">Spans</th>
-                    <th className="px-4 py-3">Metrics</th>
+                    <th className="px-4 py-3">p95 Latency</th>
+                    <th className="px-4 py-3">Deps</th>
+                    <th className="px-4 py-3">Latest Deploy</th>
+                    <th className="px-4 py-3">Last Seen</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredServices.map(({ service, health }) => (
+                  {filteredServices.map((service) => (
                     <tr
                       key={`${service.service_name}-${service.environment}`}
-                      className="border-b border-surface-border hover:bg-surface-card/50 transition-colors"
+                      className="border-b border-surface-border last:border-b-0 hover:bg-surface-card/50 transition-colors"
                     >
-                      <td className="px-4 py-3 font-medium text-white">{service.service_name}</td>
+                      <td className="px-4 py-3 font-medium text-white">
+                        <Link
+                          href={`/services/${encodeURIComponent(service.service_name)}?environment=${encodeURIComponent(service.environment)}`}
+                          className="hover:text-sidebar-active"
+                        >
+                          {service.service_name}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded text-xs bg-surface-card border border-surface-border text-gray-300">
                           {service.environment}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {formatTimestamp(service.last_seen)}
-                      </td>
                       <td className="px-4 py-3">
                         <span className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${health.color}`} />
-                          <span className="text-gray-300">{health.label}</span>
+                          <span
+                            className={`w-2 h-2 rounded-full ${healthColor(service.health_status)}`}
+                          />
+                          <span className={healthTextColor(service.health_status)}>
+                            {titleCase(service.health_status)}
+                          </span>
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {formatErrorRate(health.errorRate)}
+                      <td className="px-4 py-3 text-gray-300">
+                        {formatNumber(service.request_count)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-300">
+                        {formatNumber(service.error_count)}
                       </td>
                       <td className="px-4 py-3 text-gray-400">
-                        {service.log_count.toLocaleString()}
+                        {formatPercent(service.error_count, service.request_count)}
                       </td>
                       <td className="px-4 py-3 text-gray-400">
-                        {service.span_count.toLocaleString()}
+                        {formatMs(service.p95_latency_ms)}
                       </td>
                       <td className="px-4 py-3 text-gray-400">
-                        {service.metric_count.toLocaleString()}
+                        {formatNumber(service.dependency_count)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {service.latest_version ? (
+                          <code className="text-xs bg-surface-card px-1.5 py-0.5 rounded">
+                            {service.latest_version}
+                          </code>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {formatTimestamp(service.last_seen_at)}
                       </td>
                     </tr>
                   ))}
@@ -359,4 +248,32 @@ export default function ServicesPage() {
       )}
     </div>
   );
+}
+
+function normalizeServiceSummary(service: ServiceSummary): ServiceSummary {
+  return {
+    ...service,
+    first_seen_at: service.first_seen_at ?? service.last_seen,
+    last_seen_at: service.last_seen_at ?? service.last_seen,
+    health_status: service.health_status ?? 'unknown',
+    source_signals: service.source_signals ?? {
+      logs: service.log_count > 0,
+      traces: service.span_count > 0,
+      metrics: service.metric_count > 0,
+      deployments: false,
+    },
+    latest_version: service.latest_version ?? null,
+    latest_deployment_id: service.latest_deployment_id ?? null,
+    request_count: service.request_count ?? service.span_count ?? 0,
+    error_count: service.error_count ?? 0,
+    deployment_count: service.deployment_count ?? 0,
+    dependency_count: service.dependency_count ?? 0,
+    avg_latency_ms: service.avg_latency_ms ?? 0,
+    p95_latency_ms: service.p95_latency_ms ?? 0,
+    updated_at: service.updated_at ?? service.last_seen,
+  };
+}
+
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

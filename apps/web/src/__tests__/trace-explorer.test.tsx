@@ -134,7 +134,7 @@ describe('TraceDetailPage', () => {
     // The root span should have 0px left padding, children should have 16px
     const indentedElements = container.querySelectorAll('[style*="padding-left"]');
     const paddings = Array.from(indentedElements).map(
-      (el) => (el as HTMLElement).style.paddingLeft
+      (el) => (el as HTMLElement).style.paddingLeft,
     );
 
     // Root span at depth 0 → 0px, child spans at depth 1 → 16px

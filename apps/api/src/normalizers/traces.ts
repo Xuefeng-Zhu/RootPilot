@@ -156,7 +156,7 @@ export function mapStatusCode(code?: number): SpanStatusCode {
 export function normalizeSpans(
   resourceSpans: OTLPResourceSpans[],
   tenantId: string,
-  projectId: string
+  projectId: string,
 ): CanonicalSpan[] {
   const receivedAt = new Date().toISOString();
   const spans: CanonicalSpan[] = [];
@@ -181,7 +181,8 @@ export function normalizeSpans(
           attributes: flattenAttributes(span.attributes),
           trace_id: span.traceId,
           span_id: span.spanId,
-          parent_span_id: span.parentSpanId && span.parentSpanId.length > 0 ? span.parentSpanId : null,
+          parent_span_id:
+            span.parentSpanId && span.parentSpanId.length > 0 ? span.parentSpanId : null,
           operation_name: span.name,
           duration_ms: computeDurationMs(span.startTimeUnixNano, span.endTimeUnixNano),
           status_code: mapStatusCode(span.status?.code),

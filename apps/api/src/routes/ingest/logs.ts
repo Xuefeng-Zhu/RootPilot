@@ -1,6 +1,7 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { authMiddleware } from '../../middleware/auth.js';
-import { normalizeLogRecords, OTLPResourceLogs } from '../../normalizers/logs.js';
+import type { OTLPResourceLogs } from '../../normalizers/logs.js';
+import { normalizeLogRecords } from '../../normalizers/logs.js';
 import { getClickHouseClient } from '../../db/clickhouse.js';
 
 /**
@@ -80,10 +81,10 @@ export async function logIngestionRoute(app: FastifyInstance): Promise<void> {
           ...log,
           resource_attributes: JSON.stringify(log.resource_attributes),
           attributes: JSON.stringify(log.attributes),
-        }))
+        })),
       );
 
       return reply.status(202).send();
-    }
+    },
   );
 }

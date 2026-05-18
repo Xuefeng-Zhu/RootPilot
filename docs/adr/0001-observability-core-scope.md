@@ -1,4 +1,4 @@
-# RootPilot Phase 1 — Scope
+# ADR 0001: Observability Core Scope
 
 ## Overview
 

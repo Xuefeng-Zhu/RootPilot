@@ -30,15 +30,37 @@ describe('OverviewPage', () => {
       if (path === '/v1/services') {
         return {
           data: [
-            { service_name: 'auth-service', environment: 'production', last_seen: '2024-01-01T00:00:00Z', log_count: 120, span_count: 50, metric_count: 30 },
-            { service_name: 'api-gateway', environment: 'production', last_seen: '2024-01-01T00:00:00Z', log_count: 80, span_count: 25, metric_count: 10 },
+            {
+              service_name: 'auth-service',
+              environment: 'production',
+              last_seen: '2024-01-01T00:00:00Z',
+              log_count: 120,
+              span_count: 50,
+              metric_count: 30,
+            },
+            {
+              service_name: 'api-gateway',
+              environment: 'production',
+              last_seen: '2024-01-01T00:00:00Z',
+              log_count: 80,
+              span_count: 25,
+              metric_count: 10,
+            },
           ],
         };
       }
       if (path === '/v1/deployments') {
         return {
           data: [
-            { deployment_id: 'd1', timestamp: '2024-01-01T12:00:00Z', service_name: 'auth-service', environment: 'production', version: '1.2.0', git_sha: 'abc123', deployed_by: 'ci' },
+            {
+              deployment_id: 'd1',
+              timestamp: '2024-01-01T12:00:00Z',
+              service_name: 'auth-service',
+              environment: 'production',
+              version: '1.2.0',
+              git_sha: 'abc123',
+              deployed_by: 'ci',
+            },
           ],
           pagination: { cursor: null, hasMore: false },
         };
@@ -46,7 +68,13 @@ describe('OverviewPage', () => {
       if (path === '/v1/logs') {
         return {
           data: [
-            { id: 'log1', timestamp: '2024-01-01T11:00:00Z', service_name: 'auth-service', severity: 'ERROR', message: 'Connection timeout' },
+            {
+              id: 'log1',
+              timestamp: '2024-01-01T11:00:00Z',
+              service_name: 'auth-service',
+              severity: 'ERROR',
+              message: 'Connection timeout',
+            },
           ],
           pagination: { cursor: null, hasMore: false },
         };
@@ -83,8 +111,24 @@ describe('OverviewPage', () => {
       if (path === '/v1/deployments') {
         return {
           data: [
-            { deployment_id: 'd1', timestamp: '2024-01-01T12:00:00Z', service_name: 'auth-service', environment: 'production', version: '2.0.0', git_sha: 'abc', deployed_by: 'deploy-bot' },
-            { deployment_id: 'd2', timestamp: '2024-01-01T11:00:00Z', service_name: 'api-gateway', environment: 'staging', version: '1.5.0', git_sha: 'def', deployed_by: '' },
+            {
+              deployment_id: 'd1',
+              timestamp: '2024-01-01T12:00:00Z',
+              service_name: 'auth-service',
+              environment: 'production',
+              version: '2.0.0',
+              git_sha: 'abc',
+              deployed_by: 'deploy-bot',
+            },
+            {
+              deployment_id: 'd2',
+              timestamp: '2024-01-01T11:00:00Z',
+              service_name: 'api-gateway',
+              environment: 'staging',
+              version: '1.5.0',
+              git_sha: 'def',
+              deployed_by: '',
+            },
           ],
           pagination: { cursor: null, hasMore: false },
         };
@@ -121,8 +165,20 @@ describe('OverviewPage', () => {
       if (path === '/v1/logs') {
         return {
           data: [
-            { id: 'log1', timestamp: '2024-01-01T11:30:00Z', service_name: 'payment-service', severity: 'ERROR', message: 'Payment processing failed' },
-            { id: 'log2', timestamp: '2024-01-01T11:20:00Z', service_name: 'auth-service', severity: 'ERROR', message: 'Token expired' },
+            {
+              id: 'log1',
+              timestamp: '2024-01-01T11:30:00Z',
+              service_name: 'payment-service',
+              severity: 'ERROR',
+              message: 'Payment processing failed',
+            },
+            {
+              id: 'log2',
+              timestamp: '2024-01-01T11:20:00Z',
+              service_name: 'auth-service',
+              severity: 'ERROR',
+              message: 'Token expired',
+            },
           ],
           pagination: { cursor: null, hasMore: false },
         };

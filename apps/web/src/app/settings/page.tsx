@@ -117,7 +117,17 @@ const simulatorCommands = [
   {
     title: 'Bad Deploy',
     command: 'npm run simulate:bad-deploy -- --duration 10m --rate 30',
-    inspect: 'Overview, Logs, Traces, Services',
+    inspect: 'Deployments, Service Map, Error Groups, Service Detail',
+  },
+  {
+    title: 'Refresh correlations',
+    command: 'npm run correlations:refresh -- --from now-2h --to now',
+    inspect: 'Service Map, Services, Error Groups, Deployments',
+  },
+  {
+    title: 'Graph Traffic',
+    command: 'npm run simulate:graph',
+    inspect: 'Service Map and dependency detail',
   },
   {
     title: 'Checkout Errors',
@@ -203,8 +213,8 @@ export default function SettingsPage() {
       <section className="mb-10">
         <h2 className="text-lg font-semibold text-white mb-3">Telemetry Simulator</h2>
         <p className="text-sm text-gray-400 mb-4">
-          Generate realistic local Phase 1 telemetry for dashboards, explorers, service discovery,
-          and deployment timelines.
+          Generate realistic local telemetry for dashboards, explorers, service discovery, service
+          graph, error groups, and deployment timelines.
         </p>
         <div className="grid gap-3">
           {simulatorCommands.map((item) => (

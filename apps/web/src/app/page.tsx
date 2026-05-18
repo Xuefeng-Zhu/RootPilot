@@ -90,9 +90,7 @@ export default function OverviewPage() {
 
         // Compute summary from services data
         const services = servicesRes.data;
-        const uniqueServices = new Set(
-          services.map((s) => `${s.service_name}:${s.environment}`)
-        );
+        const uniqueServices = new Set(services.map((s) => `${s.service_name}:${s.environment}`));
         const totalLogs = services.reduce((sum, s) => sum + s.log_count, 0);
         const totalTraces = services.reduce((sum, s) => sum + s.span_count, 0);
         const totalMetrics = services.reduce((sum, s) => sum + s.metric_count, 0);
@@ -107,9 +105,7 @@ export default function OverviewPage() {
         setDeployments(deploymentsRes.data);
         setErrorLogs(logsRes.data);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Failed to load dashboard data'
-        );
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
@@ -162,33 +158,15 @@ export default function OverviewPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard
-          label="Services"
-          value={summary?.serviceCount ?? 0}
-          icon={<ServiceIcon />}
-        />
-        <SummaryCard
-          label="Logs"
-          value={summary?.logCount ?? 0}
-          icon={<LogIcon />}
-        />
-        <SummaryCard
-          label="Traces"
-          value={summary?.traceCount ?? 0}
-          icon={<TraceIcon />}
-        />
-        <SummaryCard
-          label="Metrics"
-          value={summary?.metricCount ?? 0}
-          icon={<MetricIcon />}
-        />
+        <SummaryCard label="Services" value={summary?.serviceCount ?? 0} icon={<ServiceIcon />} />
+        <SummaryCard label="Logs" value={summary?.logCount ?? 0} icon={<LogIcon />} />
+        <SummaryCard label="Traces" value={summary?.traceCount ?? 0} icon={<TraceIcon />} />
+        <SummaryCard label="Metrics" value={summary?.metricCount ?? 0} icon={<MetricIcon />} />
       </div>
 
       {/* Recent Deployments */}
       <section className="bg-surface-card border border-surface-border rounded-lg p-5">
-        <h2 className="text-lg font-semibold text-white mb-4">
-          Recent Deployments
-        </h2>
+        <h2 className="text-lg font-semibold text-white mb-4">Recent Deployments</h2>
         {deployments && deployments.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -207,9 +185,7 @@ export default function OverviewPage() {
                     key={d.deployment_id}
                     className="border-b border-surface-border/50 last:border-0"
                   >
-                    <td className="py-2.5 pr-4 font-medium text-white">
-                      {d.service_name}
-                    </td>
+                    <td className="py-2.5 pr-4 font-medium text-white">{d.service_name}</td>
                     <td className="py-2.5 pr-4">
                       <code className="text-xs bg-surface-border/50 px-1.5 py-0.5 rounded">
                         {d.version}
@@ -217,9 +193,7 @@ export default function OverviewPage() {
                     </td>
                     <td className="py-2.5 pr-4">{d.environment}</td>
                     <td className="py-2.5 pr-4">{d.deployed_by || '—'}</td>
-                    <td className="py-2.5 text-gray-400">
-                      {formatTimestamp(d.timestamp)}
-                    </td>
+                    <td className="py-2.5 text-gray-400">{formatTimestamp(d.timestamp)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -234,9 +208,7 @@ export default function OverviewPage() {
 
       {/* Recent Error Logs */}
       <section className="bg-surface-card border border-surface-border rounded-lg p-5">
-        <h2 className="text-lg font-semibold text-white mb-4">
-          Recent Errors
-        </h2>
+        <h2 className="text-lg font-semibold text-white mb-4">Recent Errors</h2>
         {errorLogs && errorLogs.length > 0 ? (
           <div className="space-y-2">
             {errorLogs.map((log) => (
@@ -253,9 +225,7 @@ export default function OverviewPage() {
                     <span>·</span>
                     <span>{formatTimestamp(log.timestamp)}</span>
                   </div>
-                  <p className="text-sm text-gray-200 truncate">
-                    {log.message}
-                  </p>
+                  <p className="text-sm text-gray-200 truncate">{log.message}</p>
                 </div>
               </div>
             ))}
@@ -287,9 +257,7 @@ function SummaryCard({
         <span className="text-sm text-gray-400">{label}</span>
         <span className="text-gray-500">{icon}</span>
       </div>
-      <p className="text-2xl font-bold text-white">
-        {value.toLocaleString()}
-      </p>
+      <p className="text-2xl font-bold text-white">{value.toLocaleString()}</p>
     </div>
   );
 }
@@ -315,32 +283,72 @@ function formatTimestamp(ts: string): string {
 
 function ServiceIcon() {
   return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"
+      />
     </svg>
   );
 }
 
 function LogIcon() {
   return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z"
+      />
     </svg>
   );
 }
 
 function TraceIcon() {
   return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
+      />
     </svg>
   );
 }
 
 function MetricIcon() {
   return (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"
+      />
     </svg>
   );
 }

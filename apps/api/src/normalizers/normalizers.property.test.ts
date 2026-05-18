@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import { mapSeverityNumber, normalizeLogRecords } from './logs.js';
-import { normalizeSpans, mapSpanKind, mapStatusCode } from './traces.js';
+import { normalizeSpans } from './traces.js';
 
 /**
  * Property-based tests for normalizer functions.
@@ -25,7 +25,7 @@ describe('Property 2: Severity Number Mapping Correctness', () => {
       fc.property(fc.integer({ min: 1, max: 4 }), (n) => {
         expect(mapSeverityNumber(n)).toBe('TRACE');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -34,7 +34,7 @@ describe('Property 2: Severity Number Mapping Correctness', () => {
       fc.property(fc.integer({ min: 5, max: 8 }), (n) => {
         expect(mapSeverityNumber(n)).toBe('DEBUG');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -43,7 +43,7 @@ describe('Property 2: Severity Number Mapping Correctness', () => {
       fc.property(fc.integer({ min: 9, max: 12 }), (n) => {
         expect(mapSeverityNumber(n)).toBe('INFO');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -52,7 +52,7 @@ describe('Property 2: Severity Number Mapping Correctness', () => {
       fc.property(fc.integer({ min: 13, max: 16 }), (n) => {
         expect(mapSeverityNumber(n)).toBe('WARN');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -61,7 +61,7 @@ describe('Property 2: Severity Number Mapping Correctness', () => {
       fc.property(fc.integer({ min: 17, max: 20 }), (n) => {
         expect(mapSeverityNumber(n)).toBe('ERROR');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -70,21 +70,21 @@ describe('Property 2: Severity Number Mapping Correctness', () => {
       fc.property(fc.integer({ min: 21, max: 24 }), (n) => {
         expect(mapSeverityNumber(n)).toBe('FATAL');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
   it('maps integers outside 1-24 to INFO', () => {
     const outsideRange = fc.oneof(
       fc.integer({ min: -1000, max: 0 }),
-      fc.integer({ min: 25, max: 1000 })
+      fc.integer({ min: 25, max: 1000 }),
     );
 
     fc.assert(
       fc.property(outsideRange, (n) => {
         expect(mapSeverityNumber(n)).toBe('INFO');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -100,7 +100,7 @@ describe('Property 2: Severity Number Mapping Correctness', () => {
         const result = mapSeverityNumber(n);
         expect(validSeverities).toContain(result);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
@@ -121,13 +121,11 @@ describe('Property 3: Span Duration Computation', () => {
     const minNano = BigInt('1577836800000000000'); // 2020-01-01T00:00:00Z
     const maxNano = BigInt('1735689600000000000'); // 2025-01-01T00:00:00Z
 
-    const nanoPairArb = fc
-      .bigInt({ min: minNano, max: maxNano })
-      .chain((start) =>
-        fc
-          .bigInt({ min: BigInt(0), max: BigInt('60000000000') }) // up to 60 seconds duration
-          .map((offset) => ({ start, end: start + offset }))
-      );
+    const nanoPairArb = fc.bigInt({ min: minNano, max: maxNano }).chain((start) =>
+      fc
+        .bigInt({ min: BigInt(0), max: BigInt('60000000000') }) // up to 60 seconds duration
+        .map((offset) => ({ start, end: start + offset })),
+    );
 
     fc.assert(
       fc.property(nanoPairArb, ({ start, end }) => {
@@ -158,7 +156,7 @@ describe('Property 3: Span Duration Computation', () => {
         const expectedDuration = Number(end - start) / 1_000_000;
         expect(result[0].duration_ms).toBeCloseTo(expectedDuration, 10);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -193,9 +191,9 @@ describe('Property 3: Span Duration Computation', () => {
 
           const result = normalizeSpans(resourceSpans, 'tenant-1', 'project-1');
           expect(result[0].duration_ms).toBe(0);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -208,7 +206,7 @@ describe('Property 3: Span Duration Computation', () => {
       .chain((start) =>
         fc
           .bigInt({ min: BigInt(0), max: BigInt('3600000000000') }) // up to 1 hour
-          .map((offset) => ({ start, end: start + offset }))
+          .map((offset) => ({ start, end: start + offset })),
       );
 
     fc.assert(
@@ -235,7 +233,7 @@ describe('Property 3: Span Duration Computation', () => {
         const result = normalizeSpans(resourceSpans, 'tenant-1', 'project-1');
         expect(result[0].duration_ms).toBeGreaterThanOrEqual(0);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
@@ -250,18 +248,13 @@ describe('Property 5: Missing Field Defaults', () => {
    * valid UUID for deployment_id.
    */
 
-  const ISO_8601_REGEX =
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
-  const UUID_V4_REGEX =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const ISO_8601_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+  const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
   it('assigns a valid ISO 8601 timestamp when log record has no timestamp', () => {
     // Generate arbitrary log payloads without timestamps
     const messageArb = fc.string({ minLength: 0, maxLength: 200 });
-    const severityArb = fc.oneof(
-      fc.constant(undefined),
-      fc.integer({ min: 1, max: 24 })
-    );
+    const severityArb = fc.oneof(fc.constant(undefined), fc.integer({ min: 1, max: 24 }));
 
     fc.assert(
       fc.property(messageArb, severityArb, (message, severityNumber) => {
@@ -290,7 +283,7 @@ describe('Property 5: Missing Field Defaults', () => {
         const parsed = new Date(result[0].timestamp);
         expect(parsed.getTime()).not.toBeNaN();
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -320,7 +313,7 @@ describe('Property 5: Missing Field Defaults', () => {
         expect(result).toHaveLength(1);
         expect(result[0].id).toMatch(UUID_V4_REGEX);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -350,7 +343,7 @@ describe('Property 5: Missing Field Defaults', () => {
         expect(result).toHaveLength(1);
         expect(result[0].severity).toBe('INFO');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -385,7 +378,7 @@ describe('Property 5: Missing Field Defaults', () => {
         expect(generatedTime).toBeGreaterThanOrEqual(before);
         expect(generatedTime).toBeLessThanOrEqual(after);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });

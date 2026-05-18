@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../server.js';
 
 // Mock the postgres module for auth middleware
@@ -286,9 +286,7 @@ describe('POST /v1/ingest/logs', () => {
             resource: {
               attributes: [{ key: 'service.name', value: { stringValue: 'svc-b' } }],
             },
-            scopeLogs: [
-              { logRecords: [{ body: { stringValue: 'log 3' } }] },
-            ],
+            scopeLogs: [{ logRecords: [{ body: { stringValue: 'log 3' } }] }],
           },
         ],
       };

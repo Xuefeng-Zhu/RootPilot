@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../server.js';
 import { authMiddleware, hashApiKey } from './auth.js';
 
