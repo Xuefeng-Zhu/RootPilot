@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../server.js';
 
 // Mock the postgres module for auth middleware
@@ -279,10 +279,10 @@ describe('GET /v1/deployments', () => {
       });
 
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryText).toContain('timestamp >= {from:String}');
-      expect(queryText).toContain('timestamp <= {to:String}');
-      expect(queryParams.from).toBe('2024-01-01T00:00:00Z');
-      expect(queryParams.to).toBe('2024-01-31T23:59:59Z');
+      expect(queryText).toContain('timestamp >= {from:DateTime64(3)}');
+      expect(queryText).toContain('timestamp <= {to:DateTime64(3)}');
+      expect(queryParams.from).toBe('2024-01-01 00:00:00.000');
+      expect(queryParams.to).toBe('2024-01-31 23:59:59.000');
     });
 
     it('uses default limit of 50', async () => {
@@ -347,7 +347,7 @@ describe('GET /v1/deployments', () => {
         makeSampleDeploymentRow({
           deployment_id: `deploy-${i}`,
           timestamp: `2024-01-15T10:${String(30 - Math.floor(i / 2)).padStart(2, '0')}:00.000`,
-        })
+        }),
       );
       mockClickhouseQuery.mockResolvedValue(rows);
 
@@ -386,7 +386,7 @@ describe('GET /v1/deployments', () => {
 
     it('applies cursor to query when provided', async () => {
       const cursor = Buffer.from(
-        JSON.stringify({ ts: '2024-01-15T10:00:00.000', id: 'deploy-50' })
+        JSON.stringify({ ts: '2024-01-15T10:00:00.000', id: 'deploy-50' }),
       ).toString('base64');
 
       mockClickhouseQuery.mockResolvedValue([]);
@@ -398,9 +398,9 @@ describe('GET /v1/deployments', () => {
       });
 
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryText).toContain('timestamp < {cursorTs:String}');
+      expect(queryText).toContain('timestamp < {cursorTs:DateTime64(3)}');
       expect(queryText).toContain('deployment_id < {cursorId:String}');
-      expect(queryParams.cursorTs).toBe('2024-01-15T10:00:00.000');
+      expect(queryParams.cursorTs).toBe('2024-01-15 10:00:00.000');
       expect(queryParams.cursorId).toBe('deploy-50');
     });
   });

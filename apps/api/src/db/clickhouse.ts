@@ -1,20 +1,15 @@
-import { createClient, ClickHouseClient } from '@clickhouse/client';
+import { createClient } from '@clickhouse/client';
+import type { ClickHouseClient } from '@clickhouse/client';
 
 /**
  * Interface for the ClickHouse client, enabling dependency injection in tests.
  */
 export interface IClickHouseClient {
   /** Execute a batch insert using JSONEachRow format. */
-  batchInsert<T extends Record<string, unknown>>(
-    table: string,
-    rows: T[]
-  ): Promise<void>;
+  batchInsert<T extends Record<string, unknown>>(table: string, rows: T[]): Promise<void>;
 
   /** Execute a parameterized read query. */
-  query<T>(
-    queryText: string,
-    params?: Record<string, unknown>
-  ): Promise<T[]>;
+  query<T>(queryText: string, params?: Record<string, unknown>): Promise<T[]>;
 
   /** Health check — executes SELECT 1. */
   healthCheck(): Promise<boolean>;
@@ -42,14 +37,12 @@ export function createClickHouseClient(config?: {
     clickhouse_settings: {
       async_insert: 1,
       wait_for_async_insert: 1,
+      date_time_input_format: 'best_effort',
     },
   });
 
   return {
-    async batchInsert<T extends Record<string, unknown>>(
-      table: string,
-      rows: T[]
-    ): Promise<void> {
+    async batchInsert<T extends Record<string, unknown>>(table: string, rows: T[]): Promise<void> {
       if (rows.length === 0) return;
 
       await client.insert({
@@ -59,10 +52,7 @@ export function createClickHouseClient(config?: {
       });
     },
 
-    async query<T>(
-      queryText: string,
-      params?: Record<string, unknown>
-    ): Promise<T[]> {
+    async query<T>(queryText: string, params?: Record<string, unknown>): Promise<T[]> {
       const result = await client.query({
         query: queryText,
         query_params: params,

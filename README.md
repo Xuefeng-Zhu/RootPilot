@@ -19,6 +19,7 @@ In another terminal, after the API is running:
 
 ```bash
 npm run seed
+npm run simulate -- --once
 ```
 
 Open `http://localhost:3000`.
@@ -30,6 +31,7 @@ npm test
 npm run lint
 npm run build --workspace=apps/api
 npm run build --workspace=apps/web
+npm run build --workspace=apps/simulator
 npm run typecheck --workspace=packages/shared
 ```
 
@@ -39,6 +41,7 @@ npm run typecheck --workspace=packages/shared
 - Architecture: `docs/architecture.md`
 - Development setup: `docs/development.md`
 - Local API examples: `docs/local-development.md`
+- Telemetry simulator: `docs/simulator.md`
 - Testing: `docs/testing.md`
 - Security: `docs/security.md`
 - Release notes: `docs/release.md`

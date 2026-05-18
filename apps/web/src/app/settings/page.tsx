@@ -108,6 +108,29 @@ const curlCommands = [
   },
 ];
 
+const simulatorCommands = [
+  {
+    title: 'Normal Traffic',
+    command: 'npm run simulate -- --scenario normal --duration 5m --rate 20',
+    inspect: 'Overview, Logs, Traces, Metrics, Services',
+  },
+  {
+    title: 'Bad Deploy',
+    command: 'npm run simulate:bad-deploy -- --duration 10m --rate 30',
+    inspect: 'Overview, Logs, Traces, Services',
+  },
+  {
+    title: 'Checkout Errors',
+    command: 'npm run simulate:checkout-error -- --duration 10m --rate 50',
+    inspect: 'Logs, Traces, Metrics',
+  },
+  {
+    title: 'Dry Run',
+    command: 'npm run simulate:dry-run',
+    inspect: 'Terminal payload output',
+  },
+];
+
 function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -176,11 +199,40 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      {/* Telemetry Simulator Section */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold text-white mb-3">Telemetry Simulator</h2>
+        <p className="text-sm text-gray-400 mb-4">
+          Generate realistic local Phase 1 telemetry for dashboards, explorers, service discovery,
+          and deployment timelines.
+        </p>
+        <div className="grid gap-3">
+          {simulatorCommands.map((item) => (
+            <div
+              key={item.title}
+              className="bg-surface-card border border-surface-border rounded-lg p-4"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-medium text-white">{item.title}</h3>
+                  <p className="text-xs text-gray-500 mt-1">Inspect: {item.inspect}</p>
+                </div>
+                <CopyButton text={item.command} label={`Copy ${item.title} simulator command`} />
+              </div>
+              <pre className="mt-3 px-3 py-2 text-xs text-gray-300 font-mono bg-surface border border-surface-border rounded overflow-x-auto whitespace-pre">
+                {item.command}
+              </pre>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Curl Commands Section */}
       <section>
         <h2 className="text-lg font-semibold text-white mb-3">Quick Start Commands</h2>
         <p className="text-sm text-gray-400 mb-4">
-          Copy-pasteable curl commands to send telemetry data to your local RootPilot instance at localhost:4000.
+          Copy-pasteable curl commands to send telemetry data to your local RootPilot instance at
+          localhost:4000.
         </p>
 
         <div className="space-y-6">
@@ -209,7 +261,13 @@ export default function SettingsPage() {
 
 function ClipboardIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -221,7 +279,13 @@ function ClipboardIcon({ className }: { className?: string }) {
 
 function CheckIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
     </svg>
   );
