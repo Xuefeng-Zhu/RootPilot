@@ -98,6 +98,10 @@ export interface GenerateBatchOptions {
 }
 
 export interface SendResult {
+  logsSent: number;
+  spansSent: number;
+  metricsSent: number;
+  deploymentEventsSent: number;
   failedHttpRequests: number;
 }
 

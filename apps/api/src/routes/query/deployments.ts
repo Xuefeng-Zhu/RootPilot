@@ -37,10 +37,11 @@ function isValidISO8601(value: string): boolean {
 }
 
 function toClickHouseDateTime(value: string): string {
-  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) {
-    return new Date(value).toISOString().replace('T', ' ').replace(/Z$/, '');
-  }
-  return value.replace('T', ' ').replace(/Z$/, '');
+  return value;
+}
+
+function parseUtcDateTime64(paramName: string): string {
+  return `parseDateTime64BestEffort({${paramName}:String}, 3, 'UTC')`;
 }
 
 interface DeploymentsQuerystring {
@@ -120,12 +121,12 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
       const queryParams: Record<string, unknown> = { tenantId };
 
       if (params.from) {
-        conditions.push('timestamp >= {from:DateTime64(3)}');
+        conditions.push(`timestamp >= ${parseUtcDateTime64('from')}`);
         queryParams.from = toClickHouseDateTime(params.from);
       }
 
       if (params.to) {
-        conditions.push('timestamp <= {to:DateTime64(3)}');
+        conditions.push(`timestamp <= ${parseUtcDateTime64('to')}`);
         queryParams.to = toClickHouseDateTime(params.to);
       }
 
@@ -142,7 +143,7 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
       // Cursor-based pagination: fetch records older than the cursor
       if (cursorData) {
         conditions.push(
-          '(timestamp < {cursorTs:DateTime64(3)} OR (timestamp = {cursorTs:DateTime64(3)} AND deployment_id < {cursorId:String}))',
+          `(timestamp < ${parseUtcDateTime64('cursorTs')} OR (timestamp = ${parseUtcDateTime64('cursorTs')} AND deployment_id < {cursorId:String}))`,
         );
         queryParams.cursorTs = toClickHouseDateTime(cursorData.ts);
         queryParams.cursorId = cursorData.id;

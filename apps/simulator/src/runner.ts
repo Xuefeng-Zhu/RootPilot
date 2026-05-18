@@ -137,10 +137,10 @@ async function handleBatch(
   }
 
   const result = await sendTelemetryBatch(config, batch, client);
-  summary.logsSent += config.dryRun ? 0 : batch.logs.length;
-  summary.spansSent += config.dryRun ? 0 : batch.spans.length;
-  summary.metricsSent += config.dryRun ? 0 : batch.metrics.length;
-  summary.deploymentEventsSent += config.dryRun ? 0 : batch.deploymentEvents.length;
+  summary.logsSent += result.logsSent;
+  summary.spansSent += result.spansSent;
+  summary.metricsSent += result.metricsSent;
+  summary.deploymentEventsSent += result.deploymentEventsSent;
   summary.failedHttpRequests += result.failedHttpRequests;
 }
 

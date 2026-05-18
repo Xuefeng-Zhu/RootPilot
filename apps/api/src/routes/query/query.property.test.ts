@@ -58,7 +58,6 @@ function mockInvalidAuth() {
   });
 }
 
-
 // ============================================================
 // Custom Arbitraries
 // ============================================================
@@ -66,14 +65,14 @@ function mockInvalidAuth() {
 /** Generates a valid tenant ID */
 const tenantIdArb = fc.stringOf(
   fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789-'.split('')),
-  { minLength: 5, maxLength: 20 }
+  { minLength: 5, maxLength: 20 },
 );
 
 /** Generates a valid service name */
-const serviceNameArb = fc.stringOf(
-  fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz-_.'.split('')),
-  { minLength: 1, maxLength: 30 }
-);
+const serviceNameArb = fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz-_.'.split('')), {
+  minLength: 1,
+  maxLength: 30,
+});
 
 /** Generates a valid environment name */
 const environmentArb = fc.constantFrom('production', 'staging', 'development', 'test', 'qa');
@@ -82,25 +81,34 @@ const environmentArb = fc.constantFrom('production', 'staging', 'development', '
 const validSeverityArb = fc.constantFrom('TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL');
 
 /** Generates an invalid severity */
-const invalidSeverityArb = fc.stringOf(
-  fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')),
-  { minLength: 1, maxLength: 10 }
-).filter((s) => !['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'].includes(s));
+const invalidSeverityArb = fc
+  .stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')), {
+    minLength: 1,
+    maxLength: 10,
+  })
+  .filter((s) => !['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'].includes(s));
 
 /** Generates a valid ISO 8601 timestamp */
-const validTimestampArb = fc.date({
-  min: new Date('2020-01-01T00:00:00Z'),
-  max: new Date('2025-12-31T23:59:59Z'),
-}).map((d) => d.toISOString());
+const validTimestampArb = fc
+  .date({
+    min: new Date('2020-01-01T00:00:00Z'),
+    max: new Date('2025-12-31T23:59:59Z'),
+  })
+  .map((d) => d.toISOString());
 
 /** Generates an invalid timestamp string */
-const invalidTimestampArb = fc.oneof(
-  fc.constant('not-a-date'),
-  fc.constant('2024-13-45T99:99:99Z'),
-  fc.constant('yesterday'),
-  fc.constant('abc123'),
-  fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz!@#$%'.split('')), { minLength: 3, maxLength: 15 })
-).filter((s) => isNaN(new Date(s).getTime()));
+const invalidTimestampArb = fc
+  .oneof(
+    fc.constant('not-a-date'),
+    fc.constant('2024-13-45T99:99:99Z'),
+    fc.constant('yesterday'),
+    fc.constant('abc123'),
+    fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz!@#$%'.split('')), {
+      minLength: 3,
+      maxLength: 15,
+    }),
+  )
+  .filter((s) => isNaN(new Date(s).getTime()));
 
 /** Generates a valid trace ID */
 const traceIdArb = fc.hexaString({ minLength: 16, maxLength: 32 });
@@ -109,38 +117,47 @@ const traceIdArb = fc.hexaString({ minLength: 16, maxLength: 32 });
 const validIntervalArb = fc.constantFrom('1m', '5m', '15m', '1h', '1d');
 
 /** Generates an invalid interval */
-const invalidIntervalArb = fc.oneof(
-  fc.constant('2m'),
-  fc.constant('3m'),
-  fc.constant('10m'),
-  fc.constant('30m'),
-  fc.constant('2h'),
-  fc.constant('6h'),
-  fc.constant('12h'),
-  fc.constant('7d'),
-  fc.constant('1w'),
-  fc.stringOf(fc.constantFrom(...'0123456789abcdefghijklmnopqrstuvwxyz'.split('')), { minLength: 2, maxLength: 5 })
-).filter((s) => !['1m', '5m', '15m', '1h', '1d'].includes(s));
+const invalidIntervalArb = fc
+  .oneof(
+    fc.constant('2m'),
+    fc.constant('3m'),
+    fc.constant('10m'),
+    fc.constant('30m'),
+    fc.constant('2h'),
+    fc.constant('6h'),
+    fc.constant('12h'),
+    fc.constant('7d'),
+    fc.constant('1w'),
+    fc.stringOf(fc.constantFrom(...'0123456789abcdefghijklmnopqrstuvwxyz'.split('')), {
+      minLength: 2,
+      maxLength: 5,
+    }),
+  )
+  .filter((s) => !['1m', '5m', '15m', '1h', '1d'].includes(s));
 
 /** Generates a valid aggregation */
 const validAggregationArb = fc.constantFrom('avg', 'sum', 'min', 'max', 'count');
 
 /** Generates an invalid aggregation */
-const invalidAggregationArb = fc.oneof(
-  fc.constant('median'),
-  fc.constant('mode'),
-  fc.constant('stddev'),
-  fc.constant('percentile'),
-  fc.constant('p99'),
-  fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz'.split('')), { minLength: 2, maxLength: 10 })
-).filter((s) => !['avg', 'sum', 'min', 'max', 'count'].includes(s));
+const invalidAggregationArb = fc
+  .oneof(
+    fc.constant('median'),
+    fc.constant('mode'),
+    fc.constant('stddev'),
+    fc.constant('percentile'),
+    fc.constant('p99'),
+    fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz'.split('')), {
+      minLength: 2,
+      maxLength: 10,
+    }),
+  )
+  .filter((s) => !['avg', 'sum', 'min', 'max', 'count'].includes(s));
 
 /** Generates a metric name */
 const metricNameArb = fc.stringOf(
   fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789._'.split('')),
-  { minLength: 1, maxLength: 30 }
+  { minLength: 1, maxLength: 30 },
 );
-
 
 // ============================================================
 // Test Setup
@@ -201,7 +218,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -220,7 +237,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -239,7 +256,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -260,7 +277,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -281,7 +298,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -302,7 +319,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -323,7 +340,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -344,7 +361,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -365,7 +382,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -384,7 +401,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -403,7 +420,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -424,7 +441,7 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -445,12 +462,11 @@ describe('Property 10: Query Parameter Validation', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockChQuery).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
 });
-
 
 // ============================================================
 // Property 6: Tenant Data Isolation
@@ -484,7 +500,7 @@ describe('Property 6: Tenant Data Isolation', () => {
         expect(queryText).toContain('tenant_id = {tenantId:String}');
         expect(queryParams.tenantId).toBe(tenantId);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -506,7 +522,7 @@ describe('Property 6: Tenant Data Isolation', () => {
         expect(queryText).toContain('tenant_id = {tenantId:String}');
         expect(queryParams.tenantId).toBe(tenantId);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -528,7 +544,7 @@ describe('Property 6: Tenant Data Isolation', () => {
         expect(queryText).toContain('tenant_id');
         expect(queryParams.tenantId).toBe(tenantId);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -550,7 +566,7 @@ describe('Property 6: Tenant Data Isolation', () => {
         expect(queryText).toContain('tenant_id = {tenantId:String}');
         expect(queryParams.tenantId).toBe(tenantId);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -572,7 +588,7 @@ describe('Property 6: Tenant Data Isolation', () => {
         expect(queryText).toContain('tenant_id = {tenantId:String}');
         expect(queryParams.tenantId).toBe(tenantId);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -602,11 +618,10 @@ describe('Property 6: Tenant Data Isolation', () => {
         expect(queryParams.tenantId).toBe(tenantB);
         expect(queryParams.tenantId).not.toBe(tenantA);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ============================================================
 // Property 7: Cross-Tenant Resource Not-Found
@@ -646,42 +661,46 @@ describe('Property 7: Cross-Tenant Resource Not-Found', () => {
         expect(queryParams.tenantId).toBe(tenantId);
         expect(queryParams.traceId).toBe(traceId);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
   it('trace detail 404 response is indistinguishable from non-existent resource', () => {
     return fc.assert(
-      fc.asyncProperty(tenantIdArb, traceIdArb, traceIdArb, async (tenantId, existingTraceId, nonExistentTraceId) => {
-        fc.pre(existingTraceId !== nonExistentTraceId);
-        mockChQuery.mockClear();
-        mockAuthForTenant(tenantId);
-        mockChQuery.mockResolvedValue([]);
+      fc.asyncProperty(
+        tenantIdArb,
+        traceIdArb,
+        traceIdArb,
+        async (tenantId, existingTraceId, nonExistentTraceId) => {
+          fc.pre(existingTraceId !== nonExistentTraceId);
+          mockChQuery.mockClear();
+          mockAuthForTenant(tenantId);
+          mockChQuery.mockResolvedValue([]);
 
-        // Query for a trace that "exists" in another tenant
-        const response1 = await app.inject({
-          method: 'GET',
-          url: `/v1/traces/${existingTraceId}`,
-          headers: { 'x-api-key': 'valid-key' },
-        });
+          // Query for a trace that "exists" in another tenant
+          const response1 = await app.inject({
+            method: 'GET',
+            url: `/v1/traces/${existingTraceId}`,
+            headers: { 'x-api-key': 'valid-key' },
+          });
 
-        // Query for a genuinely non-existent trace
-        const response2 = await app.inject({
-          method: 'GET',
-          url: `/v1/traces/${nonExistentTraceId}`,
-          headers: { 'x-api-key': 'valid-key' },
-        });
+          // Query for a genuinely non-existent trace
+          const response2 = await app.inject({
+            method: 'GET',
+            url: `/v1/traces/${nonExistentTraceId}`,
+            headers: { 'x-api-key': 'valid-key' },
+          });
 
-        // Both should return 404 with the same structure
-        expect(response1.statusCode).toBe(404);
-        expect(response2.statusCode).toBe(404);
-        expect(response1.json().error.code).toBe(response2.json().error.code);
-      }),
-      { numRuns: 100 }
+          // Both should return 404 with the same structure
+          expect(response1.statusCode).toBe(404);
+          expect(response2.statusCode).toBe(404);
+          expect(response1.json().error.code).toBe(response2.json().error.code);
+        },
+      ),
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ============================================================
 // Property 8: Query Filtering Correctness
@@ -748,7 +767,7 @@ describe('Property 8: Query Filtering Correctness', () => {
           expect(queryParams.search).toBe(filters.search);
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -797,7 +816,7 @@ describe('Property 8: Query Filtering Correctness', () => {
           expect(queryParams.minDuration).toBe(parseFloat(filters.minDuration));
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -846,7 +865,7 @@ describe('Property 8: Query Filtering Correctness', () => {
           expect(queryParams.environment).toBe(filters.environment);
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -889,23 +908,22 @@ describe('Property 8: Query Filtering Correctness', () => {
           expect(queryParams.environment).toBe(filters.environment);
         }
         if (filters.from) {
-          expect(queryText).toContain('timestamp >= {from:DateTime64(3)}');
-          expect(queryParams.from).toBe(
-            new Date(filters.from).toISOString().replace('T', ' ').replace(/Z$/, '')
+          expect(queryText).toContain(
+            "timestamp >= parseDateTime64BestEffort({from:String}, 3, 'UTC')",
           );
+          expect(queryParams.from).toBe(filters.from);
         }
         if (filters.to) {
-          expect(queryText).toContain('timestamp <= {to:DateTime64(3)}');
-          expect(queryParams.to).toBe(
-            new Date(filters.to).toISOString().replace('T', ' ').replace(/Z$/, '')
+          expect(queryText).toContain(
+            "timestamp <= parseDateTime64BestEffort({to:String}, 3, 'UTC')",
           );
+          expect(queryParams.to).toBe(filters.to);
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ============================================================
 // Property 9: Cursor-Based Pagination Consistency
@@ -971,7 +989,7 @@ describe('Property 9: Cursor-Based Pagination Consistency', () => {
         expect(decoded.ts).toBe(lastRecord.timestamp);
         expect(decoded.id).toBe(lastRecord.id);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -1017,7 +1035,7 @@ describe('Property 9: Cursor-Based Pagination Consistency', () => {
         expect(body.pagination.hasMore).toBe(false);
         expect(body.pagination.cursor).toBeNull();
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -1060,7 +1078,7 @@ describe('Property 9: Cursor-Based Pagination Consistency', () => {
         expect(decoded).toHaveProperty('ts');
         expect(decoded).toHaveProperty('id');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -1091,7 +1109,7 @@ describe('Property 9: Cursor-Based Pagination Consistency', () => {
         expect(queryParams.cursorTs).toBe(cursorData.ts);
         expect(queryParams.cursorId).toBe(cursorData.id);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -1112,11 +1130,10 @@ describe('Property 9: Cursor-Based Pagination Consistency', () => {
         const [, queryParams] = mockChQuery.mock.calls[0];
         expect(queryParams.fetchLimit).toBe(limit + 1);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ============================================================
 // Property 11: Metric Aggregation Correctness
@@ -1153,7 +1170,7 @@ describe('Property 11: Metric Aggregation Correctness', () => {
         expect(queryText).toContain('GROUP BY');
         expect(queryText).toContain('ORDER BY timestamp ASC');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -1169,20 +1186,24 @@ describe('Property 11: Metric Aggregation Correctness', () => {
     const intervalPairArb = fc.constantFrom(...intervalMappings);
 
     return fc.assert(
-      fc.asyncProperty(intervalPairArb, validAggregationArb, async ([interval, expectedSql], aggregation) => {
-        mockChQuery.mockClear();
-        mockChQuery.mockResolvedValue([]);
+      fc.asyncProperty(
+        intervalPairArb,
+        validAggregationArb,
+        async ([interval, expectedSql], aggregation) => {
+          mockChQuery.mockClear();
+          mockChQuery.mockResolvedValue([]);
 
-        await app.inject({
-          method: 'GET',
-          url: `/v1/metrics?interval=${interval}&aggregation=${aggregation}`,
-          headers: { 'x-api-key': 'valid-key' },
-        });
+          await app.inject({
+            method: 'GET',
+            url: `/v1/metrics?interval=${interval}&aggregation=${aggregation}`,
+            headers: { 'x-api-key': 'valid-key' },
+          });
 
-        const [queryText] = mockChQuery.mock.calls[0];
-        expect(queryText).toContain(expectedSql);
-      }),
-      { numRuns: 100 }
+          const [queryText] = mockChQuery.mock.calls[0];
+          expect(queryText).toContain(expectedSql);
+        },
+      ),
+      { numRuns: 100 },
     );
   });
 
@@ -1207,7 +1228,7 @@ describe('Property 11: Metric Aggregation Correctness', () => {
         expect(queryText).not.toContain('toStartOfInterval');
         expect(queryText).not.toContain('GROUP BY');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -1230,34 +1251,38 @@ describe('Property 11: Metric Aggregation Correctness', () => {
         const [queryText] = mockChQuery.mock.calls[0];
         expect(queryText).toContain('avg(value)');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
   it('returns correct response shape with aggregation metadata', () => {
     return fc.assert(
-      fc.asyncProperty(validAggregationArb, validIntervalArb, metricNameArb, async (aggregation, interval, metricName) => {
-        mockChQuery.mockClear();
-        mockChQuery.mockResolvedValue([]);
+      fc.asyncProperty(
+        validAggregationArb,
+        validIntervalArb,
+        metricNameArb,
+        async (aggregation, interval, metricName) => {
+          mockChQuery.mockClear();
+          mockChQuery.mockResolvedValue([]);
 
-        const response = await app.inject({
-          method: 'GET',
-          url: `/v1/metrics?metric_name=${encodeURIComponent(metricName)}&interval=${interval}&aggregation=${aggregation}`,
-          headers: { 'x-api-key': 'valid-key' },
-        });
+          const response = await app.inject({
+            method: 'GET',
+            url: `/v1/metrics?metric_name=${encodeURIComponent(metricName)}&interval=${interval}&aggregation=${aggregation}`,
+            headers: { 'x-api-key': 'valid-key' },
+          });
 
-        expect(response.statusCode).toBe(200);
-        const body = response.json();
-        expect(body.metric_name).toBe(metricName);
-        expect(body.aggregation).toBe(aggregation);
-        expect(body.interval).toBe(interval);
-        expect(Array.isArray(body.data)).toBe(true);
-      }),
-      { numRuns: 100 }
+          expect(response.statusCode).toBe(200);
+          const body = response.json();
+          expect(body.metric_name).toBe(metricName);
+          expect(body.aggregation).toBe(aggregation);
+          expect(body.interval).toBe(interval);
+          expect(Array.isArray(body.data)).toBe(true);
+        },
+      ),
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ============================================================
 // Property 12: Service Catalog Aggregation
@@ -1302,7 +1327,7 @@ describe('Property 12: Service Catalog Aggregation', () => {
 
         expect(queryParams.tenantId).toBe(tenantId);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -1322,7 +1347,7 @@ describe('Property 12: Service Catalog Aggregation', () => {
         const [queryText] = mockChQuery.mock.calls[0];
         expect(queryText).toContain('GROUP BY service_name, environment');
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -1336,39 +1361,42 @@ describe('Property 12: Service Catalog Aggregation', () => {
     });
 
     return fc.assert(
-      fc.asyncProperty(fc.array(serviceDataArb, { minLength: 1, maxLength: 5 }), async (services) => {
-        mockChQuery.mockClear();
-        const rows = services.map((s) => ({
-          ...s,
-          last_seen: '2024-01-15T10:30:00.000',
-        }));
-        mockChQuery.mockResolvedValue(rows);
+      fc.asyncProperty(
+        fc.array(serviceDataArb, { minLength: 1, maxLength: 5 }),
+        async (services) => {
+          mockChQuery.mockClear();
+          const rows = services.map((s) => ({
+            ...s,
+            last_seen: '2024-01-15T10:30:00.000',
+          }));
+          mockChQuery.mockResolvedValue(rows);
 
-        const response = await app.inject({
-          method: 'GET',
-          url: '/v1/services',
-          headers: { 'x-api-key': 'valid-key' },
-        });
+          const response = await app.inject({
+            method: 'GET',
+            url: '/v1/services',
+            headers: { 'x-api-key': 'valid-key' },
+          });
 
-        expect(response.statusCode).toBe(200);
-        const body = response.json();
-        expect(body.data).toHaveLength(services.length);
+          expect(response.statusCode).toBe(200);
+          const body = response.json();
+          expect(body.data).toHaveLength(services.length);
 
-        for (let i = 0; i < body.data.length; i++) {
-          const entry = body.data[i];
-          const original = services[i];
+          for (let i = 0; i < body.data.length; i++) {
+            const entry = body.data[i];
+            const original = services[i];
 
-          expect(entry.service_name).toBe(original.service_name);
-          expect(entry.environment).toBe(original.environment);
-          expect(typeof entry.log_count).toBe('number');
-          expect(typeof entry.span_count).toBe('number');
-          expect(typeof entry.metric_count).toBe('number');
-          expect(entry.log_count).toBe(parseInt(original.log_count, 10));
-          expect(entry.span_count).toBe(parseInt(original.span_count, 10));
-          expect(entry.metric_count).toBe(parseInt(original.metric_count, 10));
-        }
-      }),
-      { numRuns: 100 }
+            expect(entry.service_name).toBe(original.service_name);
+            expect(entry.environment).toBe(original.environment);
+            expect(typeof entry.log_count).toBe('number');
+            expect(typeof entry.span_count).toBe('number');
+            expect(typeof entry.metric_count).toBe('number');
+            expect(entry.log_count).toBe(parseInt(original.log_count, 10));
+            expect(entry.span_count).toBe(parseInt(original.span_count, 10));
+            expect(entry.metric_count).toBe(parseInt(original.metric_count, 10));
+          }
+        },
+      ),
+      { numRuns: 100 },
     );
   });
 
@@ -1389,7 +1417,7 @@ describe('Property 12: Service Catalog Aggregation', () => {
         const body = response.json();
         expect(body.data).toEqual([]);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
