@@ -1,4 +1,4 @@
-# Phase 2: Service Graph And Correlation
+# ADR 0002: Service Graph And Correlation Layer
 
 Phase 2 adds a deterministic correlation layer on top of RootPilot's Phase 1
 telemetry ingest and query pipeline.

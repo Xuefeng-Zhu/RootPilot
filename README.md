@@ -47,7 +47,7 @@ npm run phase2:refresh -- --from now-2h --to now
 - Development setup: `docs/development.md`
 - Local API examples: `docs/local-development.md`
 - Telemetry simulator: `docs/simulator.md`
-- Phase 2 scope: `docs/phase-2.md`
+- Phase 2 service graph and correlation ADR: `docs/adr/0002-service-graph-correlation-layer.md`
 - Service graph: `docs/service-graph.md`
 - Correlation: `docs/correlation.md`
 - Testing: `docs/testing.md`
@@ -57,7 +57,7 @@ npm run phase2:refresh -- --from now-2h --to now
 - Contributing: `docs/contributing.md`
 - Product overview: `docs/product-overview.md`
 - Agent workflow: `docs/agent-workflow.md`
-- Phase 1 scope: `docs/phase-1.md`
+- Phase 1 observability core ADR: `docs/adr/0001-observability-core-scope.md`
 
 ## Current Limitations
 

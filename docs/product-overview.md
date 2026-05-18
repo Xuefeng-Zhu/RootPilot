@@ -79,4 +79,4 @@ examples for ingestion.
 - external integrations such as Slack, PagerDuty, Jira, or Datadog
 - SSO/OAuth/SAML
 
-See `docs/phase-1.md` for the original scope document.
+See `docs/adr/0001-observability-core-scope.md` for the original scope document.
