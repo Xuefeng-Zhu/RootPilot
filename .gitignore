@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
+
+# Test and coverage output
+coverage/
+.vitest/
+
+# Tool caches
+.eslintcache
+.turbo/
+.cache/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/

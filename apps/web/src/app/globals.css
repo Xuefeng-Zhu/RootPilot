@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface text-gray-100 antialiased;
+  }
+}
+
+@layer components {
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium
+           text-sidebar-muted hover:text-sidebar-text hover:bg-sidebar-hover
+           transition-colors duration-150;
+  }
+
+  .nav-link-active {
+    @apply text-white bg-sidebar-active;
+  }
+}
+
+@layer utilities {
+  .animate-slide-in {
+    animation: slide-in 0.2s ease-out;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

@@ -1,0 +1,96 @@
+# =============================================================================
+# OpenTelemetry Collector Configuration for RootPilot
+# =============================================================================
+# This configuration sets up the OTel Collector to receive telemetry data from
+# instrumented applications and forward it to the RootPilot Ingestion API.
+#
+# Usage:
+#   docker run --rm -v $(pwd)/otel-collector-config.yaml:/etc/otelcol/config.yaml \
+#     otel/opentelemetry-collector-contrib:latest
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Receivers
+# -----------------------------------------------------------------------------
+# Receivers define how telemetry data enters the collector. We configure OTLP
+# receivers on both gRPC and HTTP protocols so instrumented applications can
+# send data using either transport.
+receivers:
+  otlp:
+    protocols:
+      # gRPC receiver on port 4317 — the default OTLP gRPC port.
+      # SDKs and agents typically use this for high-throughput streaming.
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      # HTTP receiver on port 4318 — the default OTLP HTTP port.
+      # Useful for environments where gRPC is not available or for browser-based
+      # instrumentation.
+      http:
+        endpoint: "0.0.0.0:4318"
+
+# -----------------------------------------------------------------------------
+# Processors
+# -----------------------------------------------------------------------------
+# Processors transform or batch telemetry data before it is exported.
+# The batch processor groups data into larger payloads to reduce the number of
+# outgoing requests and improve throughput to the backend.
+processors:
+  batch:
+    # Send a batch every 5 seconds or when 1024 items accumulate, whichever
+    # comes first. This balances latency with efficiency.
+    timeout: 5s
+    send_batch_size: 1024
+
+# -----------------------------------------------------------------------------
+# Exporters
+# -----------------------------------------------------------------------------
+# Exporters send processed telemetry data to external backends. Each exporter
+# targets a specific RootPilot ingestion endpoint and includes the X-API-Key
+# header for authentication with the demo tenant.
+exporters:
+  # Logs exporter — sends log data to the RootPilot log ingestion endpoint.
+  otlphttp/logs:
+    endpoint: "http://localhost:4000"
+    headers:
+      X-API-Key: "rootpilot_demo_key"
+    logs_endpoint: "http://localhost:4000/v1/ingest/logs"
+
+  # Traces exporter — sends trace/span data to the RootPilot trace ingestion endpoint.
+  otlphttp/traces:
+    endpoint: "http://localhost:4000"
+    headers:
+      X-API-Key: "rootpilot_demo_key"
+    traces_endpoint: "http://localhost:4000/v1/ingest/traces"
+
+  # Metrics exporter — sends metric data to the RootPilot metrics ingestion endpoint.
+  otlphttp/metrics:
+    endpoint: "http://localhost:4000"
+    headers:
+      X-API-Key: "rootpilot_demo_key"
+    metrics_endpoint: "http://localhost:4000/v1/ingest/metrics"
+
+# -----------------------------------------------------------------------------
+# Service
+# -----------------------------------------------------------------------------
+# The service section wires receivers, processors, and exporters into pipelines.
+# Each pipeline handles one signal type (logs, traces, or metrics) and defines
+# the data flow: receiver → processor → exporter.
+service:
+  pipelines:
+    # Logs pipeline: receives OTLP logs, batches them, and exports to RootPilot.
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/logs]
+
+    # Traces pipeline: receives OTLP traces, batches them, and exports to RootPilot.
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/traces]
+
+    # Metrics pipeline: receives OTLP metrics, batches them, and exports to RootPilot.
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/metrics]
