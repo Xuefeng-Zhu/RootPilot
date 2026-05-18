@@ -54,23 +54,25 @@ describe('MetricsExplorerPage', () => {
       { timestamp: '2024-01-01T12:04:00Z', value: 20 },
     ];
 
-    mockApiClient.mockImplementation(async (path: string, _options?: { params?: Record<string, unknown> }) => {
-      if (path === '/v1/metrics/names') {
-        return { data: ['http.request.duration'] };
-      }
-      if (path === '/v1/services') {
+    mockApiClient.mockImplementation(
+      async (path: string, _options?: { params?: Record<string, unknown> }) => {
+        if (path === '/v1/metrics/names') {
+          return { data: ['http.request.duration'] };
+        }
+        if (path === '/v1/services') {
+          return { data: [] };
+        }
+        if (path === '/v1/metrics') {
+          return {
+            metric_name: 'http.request.duration',
+            aggregation: 'avg',
+            interval: '1m',
+            data: mockData,
+          };
+        }
         return { data: [] };
-      }
-      if (path === '/v1/metrics') {
-        return {
-          metric_name: 'http.request.duration',
-          aggregation: 'avg',
-          interval: '1m',
-          data: mockData,
-        };
-      }
-      return { data: [] };
-    });
+      },
+    );
 
     const { container } = render(<MetricsExplorerPage />);
 
@@ -143,5 +145,3 @@ describe('MetricsExplorerPage', () => {
     });
   });
 });
-
-

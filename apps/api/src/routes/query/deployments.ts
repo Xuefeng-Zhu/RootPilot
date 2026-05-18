@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { authMiddleware } from '../../middleware/auth.js';
 import { getClickHouseClient } from '../../db/clickhouse.js';
+import { query as pgQuery } from '../../db/postgres.js';
 import type { DeploymentListResponse } from '@rootpilot/shared';
 import type { CanonicalDeploymentEvent, DecodedCursor } from '@rootpilot/shared';
+import { buildDeploymentImpactResponse, type DeploymentImpactRow } from './correlation-utils.js';
 
 /**
  * Decodes a base64-encoded cursor string into { ts, id }.
@@ -53,6 +55,10 @@ interface DeploymentsQuerystring {
   cursor?: string;
 }
 
+interface DeploymentDetailParams {
+  deploymentId: string;
+}
+
 /**
  * Fastify plugin that registers the GET /v1/deployments route.
  *
@@ -66,6 +72,7 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
     { preHandler: authMiddleware },
     async (request, reply) => {
       const { tenantId } = request.tenantContext;
+      const { projectId } = request.tenantContext;
       const params = request.query;
 
       // Parse and validate limit
@@ -117,8 +124,11 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
       }
 
       // Build query
-      const conditions: string[] = ['tenant_id = {tenantId:String}'];
-      const queryParams: Record<string, unknown> = { tenantId };
+      const conditions: string[] = [
+        'tenant_id = {tenantId:String}',
+        'project_id = {projectId:String}',
+      ];
+      const queryParams: Record<string, unknown> = { tenantId, projectId };
 
       if (params.from) {
         conditions.push(`timestamp >= ${parseUtcDateTime64('from')}`);
@@ -226,6 +236,70 @@ export async function deploymentsQueryRoute(app: FastifyInstance): Promise<void>
       return reply.status(200).send(response);
     },
   );
+
+  app.get<{ Params: DeploymentDetailParams }>(
+    '/v1/deployments/:deploymentId',
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      const deployment = await findDeployment(
+        request.tenantContext.tenantId,
+        request.tenantContext.projectId,
+        request.params.deploymentId,
+      );
+
+      if (!deployment) {
+        return reply.status(404).send({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Deployment '${request.params.deploymentId}' was not found`,
+          },
+        });
+      }
+
+      return reply.status(200).send({ data: deployment });
+    },
+  );
+
+  app.get<{ Params: DeploymentDetailParams }>(
+    '/v1/deployments/:deploymentId/impact',
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      const deployment = await findDeployment(
+        request.tenantContext.tenantId,
+        request.tenantContext.projectId,
+        request.params.deploymentId,
+      );
+
+      if (!deployment) {
+        return reply.status(404).send({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Deployment '${request.params.deploymentId}' was not found`,
+          },
+        });
+      }
+
+      const impactRows = await pgQuery<DeploymentImpactRow>(
+        `
+          SELECT *
+          FROM deployment_impacts
+          WHERE tenant_id = $1
+            AND project_id = $2
+            AND deployment_id = $3
+          LIMIT 1
+        `,
+        [
+          request.tenantContext.tenantId,
+          request.tenantContext.projectId,
+          request.params.deploymentId,
+        ],
+      );
+
+      return reply
+        .status(200)
+        .send(buildDeploymentImpactResponse(deployment, impactRows.rows[0] ?? null));
+    },
+  );
 }
 
 /**
@@ -238,4 +312,63 @@ function parseMetadata(metadata: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+async function findDeployment(
+  tenantId: string,
+  projectId: string,
+  deploymentId: string,
+): Promise<CanonicalDeploymentEvent | null> {
+  const clickhouse = getClickHouseClient();
+  const rows = await clickhouse.query<{
+    deployment_id: string;
+    tenant_id: string;
+    project_id: string;
+    timestamp: string;
+    service_name: string;
+    environment: string;
+    version: string;
+    git_sha: string;
+    deployed_by: string;
+    provider: string;
+    metadata: string;
+  }>(
+    `
+      SELECT
+        toString(deployment_id) AS deployment_id,
+        tenant_id,
+        project_id,
+        timestamp,
+        service_name,
+        environment,
+        version,
+        git_sha,
+        deployed_by,
+        provider,
+        metadata
+      FROM deployment_events
+      WHERE tenant_id = {tenantId:String}
+        AND project_id = {projectId:String}
+        AND toString(deployment_id) = {deploymentId:String}
+      LIMIT 1
+    `,
+    { tenantId, projectId, deploymentId },
+  );
+
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    deployment_id: row.deployment_id,
+    tenant_id: row.tenant_id,
+    project_id: row.project_id,
+    timestamp: row.timestamp,
+    service_name: row.service_name,
+    environment: row.environment,
+    version: row.version,
+    git_sha: row.git_sha,
+    deployed_by: row.deployed_by,
+    provider: row.provider,
+    metadata: parseMetadata(row.metadata),
+  };
 }

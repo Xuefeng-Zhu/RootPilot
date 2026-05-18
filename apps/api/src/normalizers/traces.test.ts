@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeSpans, mapSpanKind, mapStatusCode, OTLPResourceSpans } from './traces';
+import type { OTLPResourceSpans } from './traces';
+import { normalizeSpans, mapSpanKind, mapStatusCode } from './traces';
 
 describe('normalizeSpans', () => {
   const tenantId = 'tenant-123';
@@ -179,9 +180,7 @@ describe('normalizeSpans', () => {
     const resourceSpans: OTLPResourceSpans[] = [
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'service-a' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'service-a' } }],
         },
         scopeSpans: [
           {
@@ -217,9 +216,7 @@ describe('normalizeSpans', () => {
       },
       {
         resource: {
-          attributes: [
-            { key: 'service.name', value: { stringValue: 'service-b' } },
-          ],
+          attributes: [{ key: 'service.name', value: { stringValue: 'service-b' } }],
         },
         scopeSpans: [
           {

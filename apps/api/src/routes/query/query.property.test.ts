@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../server.js';
 
 // Mock the postgres module for auth middleware
@@ -48,12 +48,6 @@ function mockAuthForTenant(tenantId: string) {
         fields: [],
       } as any;
     }
-    return { rows: [], rowCount: 0, command: 'SELECT', oid: 0, fields: [] } as any;
-  });
-}
-
-function mockInvalidAuth() {
-  mockQuery.mockImplementation(async () => {
     return { rows: [], rowCount: 0, command: 'SELECT', oid: 0, fields: [] } as any;
   });
 }

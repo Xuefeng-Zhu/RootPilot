@@ -145,6 +145,37 @@ describe('TelemetryGenerator', () => {
     );
     expect(totalRecords).toBe(batch.logs.length);
   });
+
+  it('checkout-error creates a checkout-service to payment-service dependency', () => {
+    const batch = new TelemetryGenerator(config({ scenario: 'checkout-error' })).generateBatch({
+      timestamp: new Date('2026-05-18T12:00:00.000Z'),
+      requestCount: 1,
+    });
+
+    expect(hasDependency(batch.spans, 'checkout-service', 'payment-service')).toBe(true);
+  });
+
+  it('database-degradation creates an order-service to postgres-db dependency', () => {
+    const batch = new TelemetryGenerator(
+      config({ scenario: 'database-degradation' }),
+    ).generateBatch({
+      timestamp: new Date('2026-05-18T12:00:00.000Z'),
+      requestCount: 1,
+    });
+
+    expect(hasDependency(batch.spans, 'order-service', 'postgres-db')).toBe(true);
+  });
+
+  it('graph traffic can generate notification-service to kafka-broker dependencies', () => {
+    const batch = new TelemetryGenerator(
+      config({ scenario: 'multi-service', services: ['notification-service'] }),
+    ).generateBatch({
+      timestamp: new Date('2026-05-18T12:00:00.000Z'),
+      requestCount: 1,
+    });
+
+    expect(hasDependency(batch.spans, 'notification-service', 'kafka-broker')).toBe(true);
+  });
 });
 
 describe('SimulatorApiClient', () => {
@@ -236,3 +267,15 @@ describe('parseArgs', () => {
     expect(parsed.verbose).toBe(true);
   });
 });
+
+function hasDependency(
+  spans: { spanId: string; parentSpanId: string; serviceName: string }[],
+  source: string,
+  target: string,
+): boolean {
+  const byId = new Map(spans.map((span) => [span.spanId, span]));
+  return spans.some((span) => {
+    const parent = byId.get(span.parentSpanId);
+    return parent?.serviceName === source && span.serviceName === target;
+  });
+}

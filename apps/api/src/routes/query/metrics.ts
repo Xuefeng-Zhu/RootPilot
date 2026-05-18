@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authMiddleware } from '../../middleware/auth.js';
 import { getClickHouseClient } from '../../db/clickhouse.js';
 
@@ -91,7 +91,7 @@ export async function metricsQueryRoute(app: FastifyInstance): Promise<void> {
 
       const names = rows.map((row) => row.metric_name);
       return reply.status(200).send({ data: names });
-    }
+    },
   );
 
   // ─── GET /v1/metrics — Metric time-series data ───────────────────────
@@ -160,9 +160,7 @@ export async function metricsQueryRoute(app: FastifyInstance): Promise<void> {
       // ─── Determine aggregation and interval ──────────────────────────
 
       const interval: ValidInterval | null =
-        params.interval && params.interval !== ''
-          ? (params.interval as ValidInterval)
-          : null;
+        params.interval && params.interval !== '' ? (params.interval as ValidInterval) : null;
 
       const aggregation: ValidAggregation =
         params.aggregation && params.aggregation !== ''
@@ -228,7 +226,7 @@ export async function metricsQueryRoute(app: FastifyInstance): Promise<void> {
 
       const rows = await clickhouse.query<{ timestamp: string; value: number }>(
         queryText,
-        queryParams
+        queryParams,
       );
 
       // ─── Format response ─────────────────────────────────────────────
@@ -244,7 +242,7 @@ export async function metricsQueryRoute(app: FastifyInstance): Promise<void> {
         interval: interval || null,
         data,
       });
-    }
+    },
   );
 }
 

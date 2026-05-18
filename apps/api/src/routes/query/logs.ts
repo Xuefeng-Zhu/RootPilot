@@ -1,4 +1,4 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { authMiddleware } from '../../middleware/auth.js';
 import { getClickHouseClient } from '../../db/clickhouse.js';
 import type { CanonicalLog, LogSeverity } from '@rootpilot/shared';
@@ -6,14 +6,7 @@ import type { CanonicalLog, LogSeverity } from '@rootpilot/shared';
 /**
  * Valid severity values for log filtering.
  */
-const VALID_SEVERITIES: Set<string> = new Set([
-  'TRACE',
-  'DEBUG',
-  'INFO',
-  'WARN',
-  'ERROR',
-  'FATAL',
-]);
+const VALID_SEVERITIES: Set<string> = new Set(['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL']);
 
 /**
  * Default page size for log queries.
@@ -228,7 +221,7 @@ export async function logQueryRoute(app: FastifyInstance): Promise<void> {
       // Cursor-based pagination: fetch records older than the cursor
       if (cursorData) {
         conditions.push(
-          '(timestamp < {cursorTs:String} OR (timestamp = {cursorTs:String} AND id < {cursorId:String}))'
+          '(timestamp < {cursorTs:String} OR (timestamp = {cursorTs:String} AND id < {cursorId:String}))',
         );
         queryParams['cursorTs'] = cursorData.ts;
         queryParams['cursorId'] = cursorData.id;
@@ -319,7 +312,7 @@ export async function logQueryRoute(app: FastifyInstance): Promise<void> {
           hasMore,
         },
       });
-    }
+    },
   );
 }
 

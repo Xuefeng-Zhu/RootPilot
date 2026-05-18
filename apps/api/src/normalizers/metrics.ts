@@ -178,7 +178,7 @@ function detectMetricType(metric: OTLPMetric): MetricType | undefined {
 export function normalizeMetrics(
   resourceMetrics: OTLPResourceMetrics[],
   tenantId: string,
-  projectId: string
+  projectId: string,
 ): CanonicalMetric[] {
   const results: CanonicalMetric[] = [];
   const receivedAt = new Date().toISOString();
@@ -230,9 +230,7 @@ export function normalizeMetrics(
         } else {
           // gauge or sum
           const dataPoints =
-            metricType === 'gauge'
-              ? metric.gauge?.dataPoints
-              : metric.sum?.dataPoints;
+            metricType === 'gauge' ? metric.gauge?.dataPoints : metric.sum?.dataPoints;
 
           if (!dataPoints) continue;
 

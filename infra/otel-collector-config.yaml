@@ -21,12 +21,12 @@ receivers:
       # gRPC receiver on port 4317 — the default OTLP gRPC port.
       # SDKs and agents typically use this for high-throughput streaming.
       grpc:
-        endpoint: "0.0.0.0:4317"
+        endpoint: '0.0.0.0:4317'
       # HTTP receiver on port 4318 — the default OTLP HTTP port.
       # Useful for environments where gRPC is not available or for browser-based
       # instrumentation.
       http:
-        endpoint: "0.0.0.0:4318"
+        endpoint: '0.0.0.0:4318'
 
 # -----------------------------------------------------------------------------
 # Processors
@@ -50,24 +50,24 @@ processors:
 exporters:
   # Logs exporter — sends log data to the RootPilot log ingestion endpoint.
   otlphttp/logs:
-    endpoint: "http://localhost:4000"
+    endpoint: 'http://localhost:4000'
     headers:
-      X-API-Key: "rootpilot_demo_key"
-    logs_endpoint: "http://localhost:4000/v1/ingest/logs"
+      X-API-Key: 'rootpilot_demo_key'
+    logs_endpoint: 'http://localhost:4000/v1/ingest/logs'
 
   # Traces exporter — sends trace/span data to the RootPilot trace ingestion endpoint.
   otlphttp/traces:
-    endpoint: "http://localhost:4000"
+    endpoint: 'http://localhost:4000'
     headers:
-      X-API-Key: "rootpilot_demo_key"
-    traces_endpoint: "http://localhost:4000/v1/ingest/traces"
+      X-API-Key: 'rootpilot_demo_key'
+    traces_endpoint: 'http://localhost:4000/v1/ingest/traces'
 
   # Metrics exporter — sends metric data to the RootPilot metrics ingestion endpoint.
   otlphttp/metrics:
-    endpoint: "http://localhost:4000"
+    endpoint: 'http://localhost:4000'
     headers:
-      X-API-Key: "rootpilot_demo_key"
-    metrics_endpoint: "http://localhost:4000/v1/ingest/metrics"
+      X-API-Key: 'rootpilot_demo_key'
+    metrics_endpoint: 'http://localhost:4000/v1/ingest/metrics'
 
 # -----------------------------------------------------------------------------
 # Service

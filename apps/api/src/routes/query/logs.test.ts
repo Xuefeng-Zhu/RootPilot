@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../server.js';
 
 // Mock the postgres module for auth middleware
@@ -405,7 +405,7 @@ describe('GET /v1/logs', () => {
         makeSampleLogRow({
           id: `log-${i}`,
           timestamp: `2024-01-15T10:${String(30 - i).padStart(2, '0')}:00.000`,
-        })
+        }),
       );
       mockClickhouseQuery.mockResolvedValue(rows);
 
@@ -444,7 +444,7 @@ describe('GET /v1/logs', () => {
 
     it('applies cursor to query when provided', async () => {
       const cursor = Buffer.from(
-        JSON.stringify({ ts: '2024-01-15T10:00:00.000', id: 'log-50' })
+        JSON.stringify({ ts: '2024-01-15T10:00:00.000', id: 'log-50' }),
       ).toString('base64');
 
       mockClickhouseQuery.mockResolvedValue([]);

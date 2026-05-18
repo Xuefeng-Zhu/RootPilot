@@ -1,11 +1,14 @@
-import Fastify, { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import Fastify from 'fastify';
 import type { TenantContext } from './middleware/auth.js';
 import { metricsIngestRoute } from './routes/ingest/metrics.js';
 import { deploymentIngestRoutes } from './routes/ingest/deployments.js';
 import { logIngestionRoute } from './routes/ingest/logs.js';
 import traceIngestRoute from './routes/ingest/traces.js';
 import { servicesQueryRoute } from './routes/query/services.js';
+import { serviceMapQueryRoute } from './routes/query/service-map.js';
 import { deploymentsQueryRoute } from './routes/query/deployments.js';
+import { errorGroupsQueryRoute } from './routes/query/error-groups.js';
 import { traceQueryRoutes } from './routes/query/traces.js';
 import { metricsQueryRoute } from './routes/query/metrics.js';
 import { logQueryRoute } from './routes/query/logs.js';
@@ -52,7 +55,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(traceQueryRoutes);
   await app.register(metricsQueryRoute);
   await app.register(servicesQueryRoute);
+  await app.register(serviceMapQueryRoute);
   await app.register(deploymentsQueryRoute);
+  await app.register(errorGroupsQueryRoute);
 
   return app;
 }

@@ -9,11 +9,7 @@ export type {
   MetricType,
 } from './models';
 
-export type {
-  PaginationParams,
-  PaginatedResponse,
-  DecodedCursor,
-} from './pagination';
+export type { PaginationParams, PaginatedResponse, DecodedCursor } from './pagination';
 
 export type {
   ErrorResponse,
@@ -30,6 +26,23 @@ export type {
   MetricQueryResponse,
   ServiceEntry,
   ServiceListResponse,
+  HealthStatus,
+  DeploymentRiskLevel,
+  SourceSignals,
+  ServiceSummary,
+  ServiceListResponseV2,
+  ServiceMapNode,
+  ServiceDependency,
+  ServiceMapEdge,
+  ServiceMapResponse,
+  ErrorGroup,
+  ErrorGroupListResponse,
+  ErrorGroupDetailResponse,
+  DeploymentImpactSummary,
+  DeploymentImpactSignal,
+  DeploymentImpactResponse,
+  TimelineEvent,
+  TimelineResponse,
   DeploymentListResponse,
   DeploymentEventRequest,
 } from './api';

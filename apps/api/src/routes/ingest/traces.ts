@@ -1,6 +1,7 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { authMiddleware } from '../../middleware/auth.js';
-import { normalizeSpans, OTLPResourceSpans } from '../../normalizers/traces.js';
+import type { OTLPResourceSpans } from '../../normalizers/traces.js';
+import { normalizeSpans } from '../../normalizers/traces.js';
 import { getClickHouseClient } from '../../db/clickhouse.js';
 
 /**
@@ -191,10 +192,10 @@ export default async function traceIngestRoute(app: FastifyInstance): Promise<vo
           resource_attributes: JSON.stringify(span.resource_attributes),
           attributes: JSON.stringify(span.attributes),
           parent_span_id: span.parent_span_id ?? '',
-        }))
+        })),
       );
 
       return reply.status(202).send({ accepted: true });
-    }
+    },
   );
 }

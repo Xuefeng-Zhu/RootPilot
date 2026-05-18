@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     container_name: rootpilot-postgres
     ports:
-      - "5432:5432"
+      - '5432:5432'
     environment:
       POSTGRES_DB: rootpilot
       POSTGRES_USER: rootpilot
@@ -12,7 +12,7 @@ services:
       - ./init-postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rootpilot -d rootpilot"]
+      test: ['CMD-SHELL', 'pg_isready -U rootpilot -d rootpilot']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -22,13 +22,13 @@ services:
     image: clickhouse/clickhouse-server:24-alpine
     container_name: rootpilot-clickhouse
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - '8123:8123'
+      - '9000:9000'
     volumes:
       - ./init-clickhouse.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - clickhouse-data:/var/lib/clickhouse
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider --quiet http://127.0.0.1:8123/ping"]
+      test: ['CMD-SHELL', 'wget --spider --quiet http://127.0.0.1:8123/ping']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -40,24 +40,24 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: rootpilot-api
     ports:
-      - "4000:4000"
+      - '4000:4000'
     environment:
       POSTGRES_HOST: postgres
-      POSTGRES_PORT: "5432"
+      POSTGRES_PORT: '5432'
       POSTGRES_DB: rootpilot
       POSTGRES_USER: rootpilot
       POSTGRES_PASSWORD: rootpilot
       CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_PORT: '8123'
       CLICKHOUSE_DB: rootpilot
-      API_PORT: "4000"
+      API_PORT: '4000'
     depends_on:
       postgres:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4000/health || exit 1"]
+      test: ['CMD-SHELL', 'curl -f http://localhost:4000/health || exit 1']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -69,15 +69,15 @@ services:
       dockerfile: apps/web/Dockerfile
     container_name: rootpilot-web
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       API_URL: http://api:4000
-      WEB_PORT: "3000"
+      WEB_PORT: '3000'
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
+      test: ['CMD-SHELL', 'curl -f http://localhost:3000 || exit 1']
       interval: 5s
       timeout: 5s
       retries: 20

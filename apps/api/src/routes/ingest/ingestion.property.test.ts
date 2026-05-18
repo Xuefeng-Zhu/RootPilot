@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../server.js';
 
 // Mock the postgres module for auth middleware
@@ -26,10 +26,10 @@ const mockGetClickHouseClient = vi.mocked(getClickHouseClient);
 // ============================================================
 
 /** Generates a valid service name */
-const serviceNameArb = fc.stringOf(
-  fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz-_.'.split('')),
-  { minLength: 1, maxLength: 30 }
-);
+const serviceNameArb = fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz-_.'.split('')), {
+  minLength: 1,
+  maxLength: 30,
+});
 
 /** Generates a valid environment name */
 const environmentArb = fc.constantFrom('production', 'staging', 'development', 'test', 'qa');
@@ -41,14 +41,15 @@ const otlpAttributeArb = fc.record({
 });
 
 /** Generates a valid nanosecond timestamp (2020-2025 range) */
-const nanoTimestampArb = fc.bigInt({
-  min: BigInt('1577836800000000000'), // 2020-01-01
-  max: BigInt('1735689600000000000'), // 2025-01-01
-}).map((n) => n.toString());
+const nanoTimestampArb = fc
+  .bigInt({
+    min: BigInt('1577836800000000000'), // 2020-01-01
+    max: BigInt('1735689600000000000'), // 2025-01-01
+  })
+  .map((n) => n.toString());
 
 /** Generates a valid severity number (1-24) */
 const severityNumberArb = fc.integer({ min: 1, max: 24 });
-
 
 /** Generates a valid hex string for trace/span IDs */
 const hexIdArb = fc.hexaString({ minLength: 8, maxLength: 32 });
@@ -62,7 +63,7 @@ const validStatusCodeArb = fc.integer({ min: 0, max: 2 });
 /** Generates a non-empty, non-whitespace string for required fields */
 const nonEmptyStringArb = fc.stringOf(
   fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789.-_'.split('')),
-  { minLength: 1, maxLength: 20 }
+  { minLength: 1, maxLength: 20 },
 );
 
 /** Generates a valid OTLP log record */
@@ -87,25 +88,27 @@ const validLogPayloadArb = fc.tuple(serviceNameArb, environmentArb).chain(([svcN
         scopeLogs: [{ scope: { name: 'test-scope' }, logRecords }],
       },
     ],
-  }))
+  })),
 );
 
 /** Generates a valid OTLP span */
-const validSpanArb = fc.record({
-  traceId: hexIdArb,
-  spanId: hexIdArb,
-  name: nonEmptyStringArb,
-  startTimeUnixNano: nanoTimestampArb,
-  kind: validSpanKindArb,
-  status: fc.record({ code: validStatusCodeArb }),
-  attributes: fc.array(otlpAttributeArb, { minLength: 0, maxLength: 3 }),
-}).chain((span) =>
-  // Ensure endTimeUnixNano >= startTimeUnixNano
-  fc.bigInt({ min: BigInt(0), max: BigInt('5000000000') }).map((offset) => ({
-    ...span,
-    endTimeUnixNano: (BigInt(span.startTimeUnixNano) + offset).toString(),
-  }))
-);
+const validSpanArb = fc
+  .record({
+    traceId: hexIdArb,
+    spanId: hexIdArb,
+    name: nonEmptyStringArb,
+    startTimeUnixNano: nanoTimestampArb,
+    kind: validSpanKindArb,
+    status: fc.record({ code: validStatusCodeArb }),
+    attributes: fc.array(otlpAttributeArb, { minLength: 0, maxLength: 3 }),
+  })
+  .chain((span) =>
+    // Ensure endTimeUnixNano >= startTimeUnixNano
+    fc.bigInt({ min: BigInt(0), max: BigInt('5000000000') }).map((offset) => ({
+      ...span,
+      endTimeUnixNano: (BigInt(span.startTimeUnixNano) + offset).toString(),
+    })),
+  );
 
 /** Generates a valid OTLP trace payload */
 const validTracePayloadArb = fc.tuple(serviceNameArb, environmentArb).chain(([svcName, env]) =>
@@ -121,48 +124,54 @@ const validTracePayloadArb = fc.tuple(serviceNameArb, environmentArb).chain(([sv
         scopeSpans: [{ scope: { name: 'test-scope' }, spans }],
       },
     ],
-  }))
+  })),
 );
 
 /** Generates a valid metric type */
-const metricTypeArb = fc.constantFrom('gauge', 'sum', 'histogram') as fc.Arbitrary<'gauge' | 'sum' | 'histogram'>;
+const metricTypeArb = fc.constantFrom('gauge', 'sum', 'histogram') as fc.Arbitrary<
+  'gauge' | 'sum' | 'histogram'
+>;
 
 /** Generates a valid OTLP metric payload */
-const validMetricPayloadArb = fc.tuple(serviceNameArb, environmentArb, metricTypeArb).chain(
-  ([svcName, env, metricType]) =>
-    fc.tuple(
-      nonEmptyStringArb,
-      fc.double({ min: -1000000, max: 1000000, noNaN: true, noDefaultInfinity: true }),
-      nanoTimestampArb
-    ).map(([metricName, value, timeNano]) => {
-      const dataPoint = metricType === 'histogram'
-        ? { timeUnixNano: timeNano, sum: value, count: 10 }
-        : { timeUnixNano: timeNano, asDouble: value };
+const validMetricPayloadArb = fc
+  .tuple(serviceNameArb, environmentArb, metricTypeArb)
+  .chain(([svcName, env, metricType]) =>
+    fc
+      .tuple(
+        nonEmptyStringArb,
+        fc.double({ min: -1000000, max: 1000000, noNaN: true, noDefaultInfinity: true }),
+        nanoTimestampArb,
+      )
+      .map(([metricName, value, timeNano]) => {
+        const dataPoint =
+          metricType === 'histogram'
+            ? { timeUnixNano: timeNano, sum: value, count: 10 }
+            : { timeUnixNano: timeNano, asDouble: value };
 
-      const metricObj: Record<string, unknown> = { name: metricName, unit: 'ms' };
-      if (metricType === 'histogram') {
-        metricObj.histogram = { dataPoints: [dataPoint] };
-      } else if (metricType === 'sum') {
-        metricObj.sum = { dataPoints: [dataPoint] };
-      } else {
-        metricObj.gauge = { dataPoints: [dataPoint] };
-      }
+        const metricObj: Record<string, unknown> = { name: metricName, unit: 'ms' };
+        if (metricType === 'histogram') {
+          metricObj.histogram = { dataPoints: [dataPoint] };
+        } else if (metricType === 'sum') {
+          metricObj.sum = { dataPoints: [dataPoint] };
+        } else {
+          metricObj.gauge = { dataPoints: [dataPoint] };
+        }
 
-      return {
-        resourceMetrics: [
-          {
-            resource: {
-              attributes: [
-                { key: 'service.name', value: { stringValue: svcName } },
-                { key: 'deployment.environment', value: { stringValue: env } },
-              ],
+        return {
+          resourceMetrics: [
+            {
+              resource: {
+                attributes: [
+                  { key: 'service.name', value: { stringValue: svcName } },
+                  { key: 'deployment.environment', value: { stringValue: env } },
+                ],
+              },
+              scopeMetrics: [{ scope: { name: 'test-scope' }, metrics: [metricObj] }],
             },
-            scopeMetrics: [{ scope: { name: 'test-scope' }, metrics: [metricObj] }],
-          },
-        ],
-      };
-    })
-);
+          ],
+        };
+      }),
+  );
 
 /** Generates a valid deployment event payload */
 const validDeploymentPayloadArb = fc.record({
@@ -173,7 +182,6 @@ const validDeploymentPayloadArb = fc.record({
   deployed_by: fc.option(nonEmptyStringArb, { nil: undefined }),
   provider: fc.option(fc.constantFrom('kubernetes', 'ecs', 'lambda', 'docker'), { nil: undefined }),
 });
-
 
 // ============================================================
 // Test Setup — Single shared app instance
@@ -248,7 +256,7 @@ describe('Property 4: Payload Validation Rejection', () => {
         fc.string({ minLength: 1, maxLength: 20 }).map((s) => ({ resourceLogs: s })),
         fc.integer().map((n) => ({ resourceLogs: n })),
         fc.boolean().map((b) => ({ resourceLogs: b })),
-        fc.constant({ resourceLogs: null })
+        fc.constant({ resourceLogs: null }),
       );
 
       return fc.assert(
@@ -265,7 +273,7 @@ describe('Property 4: Payload Validation Rejection', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockBatchInsert).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -294,7 +302,7 @@ describe('Property 4: Payload Validation Rejection', () => {
           expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockBatchInsert).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -305,7 +313,7 @@ describe('Property 4: Payload Validation Rejection', () => {
         fc.record({ data: fc.string() }),
         fc.string({ minLength: 1, maxLength: 20 }).map((s) => ({ resourceSpans: s })),
         fc.integer().map((n) => ({ resourceSpans: n })),
-        fc.constant({ resourceSpans: [] })
+        fc.constant({ resourceSpans: [] }),
       );
 
       return fc.assert(
@@ -322,14 +330,14 @@ describe('Property 4: Payload Validation Rejection', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockBatchInsert).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
     it('rejects payloads with invalid span kind values', () => {
       const invalidKindArb = fc.oneof(
         fc.integer({ min: 6, max: 100 }),
-        fc.integer({ min: -100, max: -1 })
+        fc.integer({ min: -100, max: -1 }),
       );
 
       return fc.assert(
@@ -368,59 +376,68 @@ describe('Property 4: Payload Validation Rejection', () => {
           expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockBatchInsert).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
     it('rejects payloads with invalid status code values', () => {
       const invalidStatusArb = fc.oneof(
         fc.integer({ min: 3, max: 100 }),
-        fc.integer({ min: -100, max: -1 })
+        fc.integer({ min: -100, max: -1 }),
       );
 
       return fc.assert(
-        fc.asyncProperty(invalidStatusArb, hexIdArb, hexIdArb, async (statusCode, traceId, spanId) => {
-          const payload = {
-            resourceSpans: [
-              {
-                resource: { attributes: [] },
-                scopeSpans: [
-                  {
-                    spans: [
-                      {
-                        traceId,
-                        spanId,
-                        name: 'test-op',
-                        startTimeUnixNano: '1700000000000000000',
-                        endTimeUnixNano: '1700000000100000000',
-                        kind: 2,
-                        status: { code: statusCode },
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          };
+        fc.asyncProperty(
+          invalidStatusArb,
+          hexIdArb,
+          hexIdArb,
+          async (statusCode, traceId, spanId) => {
+            const payload = {
+              resourceSpans: [
+                {
+                  resource: { attributes: [] },
+                  scopeSpans: [
+                    {
+                      spans: [
+                        {
+                          traceId,
+                          spanId,
+                          name: 'test-op',
+                          startTimeUnixNano: '1700000000000000000',
+                          endTimeUnixNano: '1700000000100000000',
+                          kind: 2,
+                          status: { code: statusCode },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            };
 
-          const response = await app.inject({
-            method: 'POST',
-            url: '/v1/ingest/traces',
-            headers: { 'content-type': 'application/json', 'x-api-key': 'valid-key' },
-            payload,
-          });
+            const response = await app.inject({
+              method: 'POST',
+              url: '/v1/ingest/traces',
+              headers: { 'content-type': 'application/json', 'x-api-key': 'valid-key' },
+              payload,
+            });
 
-          expect(response.statusCode).toBe(400);
-          expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
-          expect(mockBatchInsert).not.toHaveBeenCalled();
-        }),
-        { numRuns: 100 }
+            expect(response.statusCode).toBe(400);
+            expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
+            expect(mockBatchInsert).not.toHaveBeenCalled();
+          },
+        ),
+        { numRuns: 100 },
       );
     });
 
     it('rejects payloads with missing required span fields', () => {
       const missingFieldArb = fc.constantFrom(
-        'traceId', 'spanId', 'name', 'startTimeUnixNano', 'endTimeUnixNano'
+        'traceId',
+        'spanId',
+        'name',
+        'startTimeUnixNano',
+        'endTimeUnixNano',
       );
 
       return fc.assert(
@@ -455,11 +472,10 @@ describe('Property 4: Payload Validation Rejection', () => {
           expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockBatchInsert).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
-
 
   describe('POST /v1/ingest/metrics — invalid payloads', () => {
     it('rejects payloads with missing or invalid resourceMetrics', () => {
@@ -467,7 +483,7 @@ describe('Property 4: Payload Validation Rejection', () => {
         fc.record({ data: fc.string() }),
         fc.string({ minLength: 1, maxLength: 20 }).map((s) => ({ resourceMetrics: s })),
         fc.integer().map((n) => ({ resourceMetrics: n })),
-        fc.constant({ resourceMetrics: [] })
+        fc.constant({ resourceMetrics: [] }),
       );
 
       return fc.assert(
@@ -484,23 +500,28 @@ describe('Property 4: Payload Validation Rejection', () => {
           expect(body.error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockBatchInsert).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
     it('rejects metric payloads with non-numeric values', () => {
       // Generate strings that cannot be coerced to a finite number
-      const nonNumericArb = fc.oneof(
-        fc.constant('abc'),
-        fc.constant('not-a-number'),
-        fc.constant('hello'),
-        fc.constant('NaN'),
-        fc.constant('Infinity'),
-        fc.constant('-Infinity'),
-        fc.constant('true'),
-        fc.constant('false'),
-        fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz!@#$%'.split('')), { minLength: 1, maxLength: 10 })
-      ).filter((s) => !isFinite(Number(s)));
+      const nonNumericArb = fc
+        .oneof(
+          fc.constant('abc'),
+          fc.constant('not-a-number'),
+          fc.constant('hello'),
+          fc.constant('NaN'),
+          fc.constant('Infinity'),
+          fc.constant('-Infinity'),
+          fc.constant('true'),
+          fc.constant('false'),
+          fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz!@#$%'.split('')), {
+            minLength: 1,
+            maxLength: 10,
+          }),
+        )
+        .filter((s) => !isFinite(Number(s)));
 
       return fc.assert(
         fc.asyncProperty(nonNumericArb, nonEmptyStringArb, async (badValue, metricName) => {
@@ -535,7 +556,7 @@ describe('Property 4: Payload Validation Rejection', () => {
           expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockBatchInsert).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -571,9 +592,9 @@ describe('Property 4: Payload Validation Rejection', () => {
             expect(response.statusCode).toBe(400);
             expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
             expect(mockBatchInsert).not.toHaveBeenCalled();
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -604,7 +625,7 @@ describe('Property 4: Payload Validation Rejection', () => {
           expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockBatchInsert).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -614,26 +635,31 @@ describe('Property 4: Payload Validation Rejection', () => {
       const missingFieldArb = fc.constantFrom('service_name', 'environment', 'version');
 
       return fc.assert(
-        fc.asyncProperty(missingFieldArb, serviceNameArb, environmentArb, async (missingField, svc, env) => {
-          const payload: Record<string, string> = {
-            service_name: svc,
-            environment: env,
-            version: '1.0.0',
-          };
-          delete payload[missingField];
+        fc.asyncProperty(
+          missingFieldArb,
+          serviceNameArb,
+          environmentArb,
+          async (missingField, svc, env) => {
+            const payload: Record<string, string> = {
+              service_name: svc,
+              environment: env,
+              version: '1.0.0',
+            };
+            delete payload[missingField];
 
-          const response = await app.inject({
-            method: 'POST',
-            url: '/v1/events/deployments',
-            headers: { 'content-type': 'application/json', 'x-api-key': 'valid-key' },
-            payload,
-          });
+            const response = await app.inject({
+              method: 'POST',
+              url: '/v1/events/deployments',
+              headers: { 'content-type': 'application/json', 'x-api-key': 'valid-key' },
+              payload,
+            });
 
-          expect(response.statusCode).toBe(400);
-          expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
-          expect(mockBatchInsert).not.toHaveBeenCalled();
-        }),
-        { numRuns: 100 }
+            expect(response.statusCode).toBe(400);
+            expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
+            expect(mockBatchInsert).not.toHaveBeenCalled();
+          },
+        ),
+        { numRuns: 100 },
       );
     });
 
@@ -642,7 +668,7 @@ describe('Property 4: Payload Validation Rejection', () => {
         fc.integer().map((n) => n as unknown),
         fc.boolean().map((b) => b as unknown),
         fc.constant(null as unknown),
-        fc.constant([] as unknown)
+        fc.constant([] as unknown),
       );
 
       return fc.assert(
@@ -664,12 +690,11 @@ describe('Property 4: Payload Validation Rejection', () => {
           expect(response.json().error.message.length).toBeGreaterThanOrEqual(10);
           expect(mockBatchInsert).not.toHaveBeenCalled();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
 });
-
 
 // ============================================================
 // Property 1: Ingestion Round-Trip Preservation
@@ -712,7 +737,7 @@ describe('Property 1: Ingestion Round-Trip Preservation', () => {
 
             // Verify id is a valid UUID v4
             expect(row.id).toMatch(
-              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
             );
 
             // Verify timestamp is valid ISO 8601
@@ -733,59 +758,69 @@ describe('Property 1: Ingestion Round-Trip Preservation', () => {
             expect(row.service_name).toBe(resAttrs['service.name']);
           }
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
     it('correctly maps severity numbers to severity strings', () => {
       const severityMappings: Array<[number, string]> = [
-        [1, 'TRACE'], [4, 'TRACE'],
-        [5, 'DEBUG'], [8, 'DEBUG'],
-        [9, 'INFO'], [12, 'INFO'],
-        [13, 'WARN'], [16, 'WARN'],
-        [17, 'ERROR'], [20, 'ERROR'],
-        [21, 'FATAL'], [24, 'FATAL'],
+        [1, 'TRACE'],
+        [4, 'TRACE'],
+        [5, 'DEBUG'],
+        [8, 'DEBUG'],
+        [9, 'INFO'],
+        [12, 'INFO'],
+        [13, 'WARN'],
+        [16, 'WARN'],
+        [17, 'ERROR'],
+        [20, 'ERROR'],
+        [21, 'FATAL'],
+        [24, 'FATAL'],
       ];
 
       const severityPairArb = fc.constantFrom(...severityMappings);
 
       return fc.assert(
-        fc.asyncProperty(severityPairArb, serviceNameArb, async ([severityNum, expectedSeverity], svcName) => {
-          mockBatchInsert.mockClear();
+        fc.asyncProperty(
+          severityPairArb,
+          serviceNameArb,
+          async ([severityNum, expectedSeverity], svcName) => {
+            mockBatchInsert.mockClear();
 
-          const payload = {
-            resourceLogs: [
-              {
-                resource: {
-                  attributes: [{ key: 'service.name', value: { stringValue: svcName } }],
-                },
-                scopeLogs: [
-                  {
-                    logRecords: [
-                      {
-                        timeUnixNano: '1700000000000000000',
-                        severityNumber: severityNum,
-                        body: { stringValue: 'test message' },
-                      },
-                    ],
+            const payload = {
+              resourceLogs: [
+                {
+                  resource: {
+                    attributes: [{ key: 'service.name', value: { stringValue: svcName } }],
                   },
-                ],
-              },
-            ],
-          };
+                  scopeLogs: [
+                    {
+                      logRecords: [
+                        {
+                          timeUnixNano: '1700000000000000000',
+                          severityNumber: severityNum,
+                          body: { stringValue: 'test message' },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            };
 
-          const response = await app.inject({
-            method: 'POST',
-            url: '/v1/ingest/logs',
-            headers: { 'content-type': 'application/json', 'x-api-key': 'valid-key' },
-            payload,
-          });
+            const response = await app.inject({
+              method: 'POST',
+              url: '/v1/ingest/logs',
+              headers: { 'content-type': 'application/json', 'x-api-key': 'valid-key' },
+              payload,
+            });
 
-          expect(response.statusCode).toBe(202);
-          const [, rows] = mockBatchInsert.mock.calls[0];
-          expect(rows[0].severity).toBe(expectedSeverity);
-        }),
-        { numRuns: 100 }
+            expect(response.statusCode).toBe(202);
+            const [, rows] = mockBatchInsert.mock.calls[0];
+            expect(rows[0].severity).toBe(expectedSeverity);
+          },
+        ),
+        { numRuns: 100 },
       );
     });
 
@@ -830,11 +865,10 @@ describe('Property 1: Ingestion Round-Trip Preservation', () => {
           const expectedISO = new Date(expectedMillis).toISOString();
           expect(rows[0].timestamp).toBe(expectedISO);
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
-
 
   describe('POST /v1/ingest/traces — round-trip preservation', () => {
     it('preserves canonical fields after normalization for valid trace payloads', () => {
@@ -875,13 +909,18 @@ describe('Property 1: Ingestion Round-Trip Preservation', () => {
 
             // Verify duration_ms computation
             const expectedDuration =
-              Number(BigInt(inputSpan.endTimeUnixNano) - BigInt(inputSpan.startTimeUnixNano)) / 1_000_000;
+              Number(BigInt(inputSpan.endTimeUnixNano) - BigInt(inputSpan.startTimeUnixNano)) /
+              1_000_000;
             expect(row.duration_ms).toBeCloseTo(expectedDuration, 10);
 
             // Verify kind mapping
             const kindMap: Record<number, string> = {
-              0: 'INTERNAL', 1: 'INTERNAL', 2: 'SERVER',
-              3: 'CLIENT', 4: 'PRODUCER', 5: 'CONSUMER',
+              0: 'INTERNAL',
+              1: 'INTERNAL',
+              2: 'SERVER',
+              3: 'CLIENT',
+              4: 'PRODUCER',
+              5: 'CONSUMER',
             };
             expect(row.kind).toBe(kindMap[inputSpan.kind]);
 
@@ -891,11 +930,11 @@ describe('Property 1: Ingestion Round-Trip Preservation', () => {
 
             // Verify id is a valid UUID
             expect(row.id).toMatch(
-              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
             );
           }
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -940,13 +979,13 @@ describe('Property 1: Ingestion Round-Trip Preservation', () => {
 
           // Verify id is a valid UUID
           expect(row.id).toMatch(
-            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
           );
 
           // Verify timestamp is valid ISO 8601
           expect(new Date(row.timestamp).getTime()).not.toBeNaN();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -984,7 +1023,7 @@ describe('Property 1: Ingestion Round-Trip Preservation', () => {
 
           // Verify deployment_id is a valid UUID
           expect(row.deployment_id).toMatch(
-            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+            /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
           );
 
           // Verify timestamp is valid ISO 8601
@@ -1001,7 +1040,7 @@ describe('Property 1: Ingestion Round-Trip Preservation', () => {
             expect(row.provider).toBe(payload.provider);
           }
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });

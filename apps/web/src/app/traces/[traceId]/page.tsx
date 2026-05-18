@@ -50,10 +50,7 @@ export default function TraceDetailPage() {
         if (err instanceof ApiError && err.status === 404) {
           setNotFound(true);
         } else {
-          const message =
-            err instanceof ApiError
-              ? err.message
-              : 'Failed to fetch trace details';
+          const message = err instanceof ApiError ? err.message : 'Failed to fetch trace details';
           setError(message);
         }
       } finally {
@@ -72,9 +69,7 @@ export default function TraceDetailPage() {
 
     // Calculate trace time boundaries
     const timestamps = spans.map((s) => new Date(s.timestamp).getTime());
-    const endTimes = spans.map(
-      (s) => new Date(s.timestamp).getTime() + s.duration_ms
-    );
+    const endTimes = spans.map((s) => new Date(s.timestamp).getTime() + s.duration_ms);
     const traceStartMs = Math.min(...timestamps);
     const traceEndMs = Math.max(...endTimes);
     const totalDuration = traceEndMs - traceStartMs || 1; // avoid division by zero
@@ -99,15 +94,13 @@ export default function TraceDetailPage() {
     // Sort children by timestamp
     function sortChildren(node: SpanNode) {
       node.children.sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
       );
       for (const child of node.children) {
         sortChildren(child);
       }
     }
-    roots.sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    );
+    roots.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     for (const root of roots) {
       sortChildren(root);
     }
@@ -221,8 +214,7 @@ export default function TraceDetailPage() {
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-400">
-            {spans.length} span{spans.length !== 1 ? 's' : ''} ·{' '}
-            {formatDuration(traceDuration)}
+            {spans.length} span{spans.length !== 1 ? 's' : ''} · {formatDuration(traceDuration)}
           </p>
         </div>
       </div>
@@ -243,7 +235,7 @@ export default function TraceDetailPage() {
             const leftPercent = (spanStart / traceDuration) * 100;
             const widthPercent = Math.max(
               (span.duration_ms / traceDuration) * 100,
-              0.5 // minimum width for visibility
+              0.5, // minimum width for visibility
             );
 
             return (

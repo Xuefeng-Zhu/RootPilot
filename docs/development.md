@@ -39,6 +39,7 @@ Initialize schemas:
 
 ```bash
 npm run db:init
+npm run db:migrate
 ```
 
 Stop services:
@@ -114,11 +115,10 @@ Seed script:
 
 Web:
 
-- `apps/web/src/lib/api.ts` currently hardcodes `http://localhost:4000` and
-  `rootpilot_demo_key`.
+- `apps/web/src/lib/api.ts` uses `NEXT_PUBLIC_API_BASE_URL` or `/api` by
+  default, and sends the demo API key `rootpilot_demo_key`.
 - `apps/web/next.config.js` contains a rewrite from `/api/:path*` to
-  `http://localhost:4000/:path*`, but the current browser API client does not
-  use `/api`.
+  `http://localhost:4000/:path*`.
 
 ## Docker Compose Caveat
 
@@ -146,6 +146,13 @@ Build workspaces:
 npm run build --workspace=apps/api
 npm run build --workspace=apps/web
 npm run typecheck --workspace=packages/shared
+```
+
+Refresh Phase 2 service graph and correlation data:
+
+```bash
+npm run simulate:bad-deploy -- --duration 10m --rate 30
+npm run phase2:refresh -- --from now-2h --to now
 ```
 
 Use API examples from `docs/local-development.md` for manual smoke checks.

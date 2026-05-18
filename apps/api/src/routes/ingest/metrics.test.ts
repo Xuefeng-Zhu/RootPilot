@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../server.js';
 
 // Mock the postgres module for auth middleware
@@ -67,9 +67,7 @@ function validMetricPayload() {
                     {
                       timeUnixNano: '1700000000000000000',
                       asDouble: 42.5,
-                      attributes: [
-                        { key: 'method', value: { stringValue: 'GET' } },
-                      ],
+                      attributes: [{ key: 'method', value: { stringValue: 'GET' } }],
                     },
                   ],
                 },
@@ -237,9 +235,7 @@ describe('POST /v1/ingest/metrics', () => {
               resource: { attributes: [] },
               scopeMetrics: [
                 {
-                  metrics: [
-                    { gauge: { dataPoints: [{ asDouble: 1.0 }] } },
-                  ],
+                  metrics: [{ gauge: { dataPoints: [{ asDouble: 1.0 }] } }],
                 },
               ],
             },
@@ -263,9 +259,7 @@ describe('POST /v1/ingest/metrics', () => {
               resource: { attributes: [] },
               scopeMetrics: [
                 {
-                  metrics: [
-                    { name: 'cpu.usage' },
-                  ],
+                  metrics: [{ name: 'cpu.usage' }],
                 },
               ],
             },
@@ -401,9 +395,7 @@ describe('POST /v1/ingest/metrics', () => {
         resourceMetrics: [
           {
             resource: {
-              attributes: [
-                { key: 'service.name', value: { stringValue: 'my-service' } },
-              ],
+              attributes: [{ key: 'service.name', value: { stringValue: 'my-service' } }],
             },
             scopeMetrics: [
               {
@@ -411,9 +403,7 @@ describe('POST /v1/ingest/metrics', () => {
                   {
                     name: 'http.request.count',
                     sum: {
-                      dataPoints: [
-                        { timeUnixNano: '1700000000000000000', asInt: 100 },
-                      ],
+                      dataPoints: [{ timeUnixNano: '1700000000000000000', asInt: 100 }],
                       isMonotonic: true,
                     },
                   },
@@ -439,9 +429,7 @@ describe('POST /v1/ingest/metrics', () => {
         resourceMetrics: [
           {
             resource: {
-              attributes: [
-                { key: 'service.name', value: { stringValue: 'my-service' } },
-              ],
+              attributes: [{ key: 'service.name', value: { stringValue: 'my-service' } }],
             },
             scopeMetrics: [
               {
@@ -527,9 +515,7 @@ describe('POST /v1/ingest/metrics', () => {
         resourceMetrics: [
           {
             resource: {
-              attributes: [
-                { key: 'service.name', value: { stringValue: 'svc-a' } },
-              ],
+              attributes: [{ key: 'service.name', value: { stringValue: 'svc-a' } }],
             },
             scopeMetrics: [
               {
@@ -574,9 +560,7 @@ describe('POST /v1/ingest/metrics', () => {
         resourceMetrics: [
           {
             resource: {
-              attributes: [
-                { key: 'service.name', value: { stringValue: 'my-service' } },
-              ],
+              attributes: [{ key: 'service.name', value: { stringValue: 'my-service' } }],
             },
             scopeMetrics: [
               {

@@ -2,12 +2,7 @@
  * API request/response shape types, query filter types, and error response interface.
  */
 
-import type {
-  CanonicalDeploymentEvent,
-  CanonicalLog,
-  CanonicalSpan,
-  LogSeverity,
-} from './models';
+import type { CanonicalDeploymentEvent, CanonicalLog, CanonicalSpan, LogSeverity } from './models';
 import type { PaginatedResponse } from './pagination';
 
 // ─── Error Response ──────────────────────────────────────────────────────────
@@ -55,6 +50,8 @@ export interface MetricQueryFilters {
 
 export interface ServiceQueryFilters {
   environment?: string;
+  from?: string;
+  to?: string;
 }
 
 export interface DeploymentQueryFilters {
@@ -105,6 +102,19 @@ export interface ServiceEntry {
   log_count: number;
   span_count: number;
   metric_count: number;
+  first_seen_at?: string;
+  last_seen_at?: string;
+  source_signals?: SourceSignals;
+  latest_version?: string | null;
+  latest_deployment_id?: string | null;
+  request_count?: number;
+  error_count?: number;
+  deployment_count?: number;
+  dependency_count?: number;
+  avg_latency_ms?: number;
+  p95_latency_ms?: number;
+  health_status?: HealthStatus;
+  updated_at?: string;
 }
 
 export interface ServiceListResponse {
@@ -112,6 +122,166 @@ export interface ServiceListResponse {
 }
 
 export type DeploymentListResponse = PaginatedResponse<CanonicalDeploymentEvent>;
+
+// ─── Phase 2 Service Graph And Correlation Types ────────────────────────────
+
+export type HealthStatus = 'healthy' | 'warning' | 'degraded' | 'unknown';
+
+export type DeploymentRiskLevel = 'low' | 'medium' | 'high' | 'unknown';
+
+export interface SourceSignals {
+  logs: boolean;
+  traces: boolean;
+  metrics: boolean;
+  deployments: boolean;
+  log_count?: number;
+  span_count?: number;
+  metric_count?: number;
+  deployment_count?: number;
+}
+
+export interface ServiceSummary {
+  id: string;
+  service_name: string;
+  environment: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  last_seen: string;
+  source_signals: SourceSignals;
+  latest_version: string | null;
+  latest_deployment_id: string | null;
+  request_count: number;
+  error_count: number;
+  log_count: number;
+  span_count: number;
+  metric_count: number;
+  deployment_count: number;
+  dependency_count: number;
+  avg_latency_ms: number;
+  p95_latency_ms: number;
+  health_status: HealthStatus;
+  updated_at: string;
+}
+
+export interface ServiceListResponseV2 {
+  data: ServiceSummary[];
+}
+
+export interface ServiceMapNode {
+  id: string;
+  name: string;
+  environment: string;
+  health_status: HealthStatus;
+  request_count: number;
+  error_count: number;
+  avg_latency_ms: number;
+  p95_latency_ms: number;
+  last_seen_at: string;
+  latest_version: string | null;
+  latest_deployment_id: string | null;
+}
+
+export interface ServiceDependency {
+  id: string;
+  environment: string;
+  source_service: string;
+  target_service: string;
+  operation_name: string;
+  call_count: number;
+  error_count: number;
+  avg_duration_ms: number;
+  p95_duration_ms: number;
+  last_seen_at: string;
+  example_trace_id: string | null;
+}
+
+export interface ServiceMapEdge {
+  id: string;
+  source: string;
+  target: string;
+  operation_name: string;
+  call_count: number;
+  error_count: number;
+  avg_duration_ms: number;
+  p95_duration_ms: number;
+  last_seen_at: string;
+  example_trace_id: string | null;
+}
+
+export interface ServiceMapResponse {
+  nodes: ServiceMapNode[];
+  edges: ServiceMapEdge[];
+}
+
+export interface ErrorGroup {
+  id: string;
+  service_name: string;
+  environment: string;
+  fingerprint: string;
+  error_type: string | null;
+  normalized_message: string;
+  example_message: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  count: number;
+  affected_traces_count: number;
+  example_trace_id: string | null;
+  severity: string;
+  is_new: boolean;
+  updated_at: string;
+}
+
+export interface ErrorGroupListResponse {
+  data: ErrorGroup[];
+}
+
+export interface ErrorGroupDetailResponse {
+  data: ErrorGroup;
+}
+
+export interface DeploymentImpactSummary {
+  risk_level: DeploymentRiskLevel;
+  error_count_before: number;
+  error_count_after: number;
+  p95_latency_before_ms: number;
+  p95_latency_after_ms: number;
+  new_error_groups: number;
+}
+
+export interface DeploymentImpactSignal {
+  type: 'error_group' | 'latency' | 'error_rate' | 'deployment';
+  message: string;
+  error_group_id?: string;
+}
+
+export interface DeploymentImpactResponse {
+  deployment: CanonicalDeploymentEvent;
+  window: {
+    before: string;
+    after: string;
+  };
+  summary: DeploymentImpactSummary;
+  signals: DeploymentImpactSignal[];
+  example_trace_ids: string[];
+}
+
+export interface TimelineEvent {
+  type:
+    | 'deployment'
+    | 'new_error_group'
+    | 'error_spike'
+    | 'latency_spike'
+    | 'dependency_degradation'
+    | 'service_first_seen';
+  timestamp: string;
+  title: string;
+  severity: 'info' | 'warning' | 'error';
+  metadata?: Record<string, unknown>;
+}
+
+export interface TimelineResponse {
+  data: TimelineEvent[];
+}
 
 // ─── Ingestion Request Types ─────────────────────────────────────────────────
 

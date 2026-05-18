@@ -8,16 +8,16 @@ The architecture follows a clear separation: an **Ingestion API** receives and n
 
 ### Key Design Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| API framework | Fastify | High throughput, schema validation via JSON Schema, first-class TypeScript support, `inject()` for testing |
-| Telemetry store | ClickHouse (MergeTree) | Columnar storage optimized for time-series append and analytical queries at scale |
-| Metadata store | Postgres | ACID guarantees for tenant/project/API key management |
-| Frontend | Next.js (App Router) | Server components for initial load, client components for interactive explorers |
-| Monorepo | npm workspaces | Zero-config workspace protocol, shared types package |
-| Auth model | API key in `X-API-Key` header | Simple, stateless, suitable for machine-to-machine ingestion |
-| Pagination | Cursor-based | Stable pagination over append-only time-series data |
-| Local infra | Docker Compose | Single-command local stack with health-check orchestration |
+| Decision        | Choice                        | Rationale                                                                                                  |
+| --------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| API framework   | Fastify                       | High throughput, schema validation via JSON Schema, first-class TypeScript support, `inject()` for testing |
+| Telemetry store | ClickHouse (MergeTree)        | Columnar storage optimized for time-series append and analytical queries at scale                          |
+| Metadata store  | Postgres                      | ACID guarantees for tenant/project/API key management                                                      |
+| Frontend        | Next.js (App Router)          | Server components for initial load, client components for interactive explorers                            |
+| Monorepo        | npm workspaces                | Zero-config workspace protocol, shared types package                                                       |
+| Auth model      | API key in `X-API-Key` header | Simple, stateless, suitable for machine-to-machine ingestion                                               |
+| Pagination      | Cursor-based                  | Stable pagination over append-only time-series data                                                        |
+| Local infra     | Docker Compose                | Single-command local stack with health-check orchestration                                                 |
 
 ## Architecture
 
@@ -86,6 +86,7 @@ sequenceDiagram
 ### 1. Auth Middleware (`apps/api/src/middleware/auth.ts`)
 
 Fastify `preHandler` hook that:
+
 1. Extracts `X-API-Key` header
 2. Queries Postgres for matching key (WHERE key_hash = hash(key) AND revoked_at IS NULL)
 3. Attaches `tenant_id` and `project_id` to the request context
@@ -93,44 +94,47 @@ Fastify `preHandler` hook that:
 
 ```typescript
 interface TenantContext {
-  tenantId: string;    // UUID
-  projectId: string;   // UUID
-  keyId: string;       // UUID of the API key record
+  tenantId: string; // UUID
+  projectId: string; // UUID
+  keyId: string; // UUID of the API key record
 }
 ```
 
 ### 2. Ingestion Handlers (`apps/api/src/routes/ingest/`)
 
 Each handler follows the same pattern:
+
 1. Parse and validate the incoming JSON payload against a JSON Schema
 2. Normalize OTLP structure to the canonical model
 3. Batch insert into ClickHouse
 4. Return 202 Accepted
 
-| Endpoint | Handler | ClickHouse Table |
-|----------|---------|-----------------|
-| `POST /v1/ingest/logs` | `logs.ts` | `rootpilot.logs` |
-| `POST /v1/ingest/traces` | `traces.ts` | `rootpilot.spans` |
-| `POST /v1/ingest/metrics` | `metrics.ts` | `rootpilot.metrics` |
+| Endpoint                      | Handler          | ClickHouse Table              |
+| ----------------------------- | ---------------- | ----------------------------- |
+| `POST /v1/ingest/logs`        | `logs.ts`        | `rootpilot.logs`              |
+| `POST /v1/ingest/traces`      | `traces.ts`      | `rootpilot.spans`             |
+| `POST /v1/ingest/metrics`     | `metrics.ts`     | `rootpilot.metrics`           |
 | `POST /v1/events/deployments` | `deployments.ts` | `rootpilot.deployment_events` |
 
 **Payload limits:**
+
 - Max body size: 5 MB (enforced at Fastify level)
 - Max log records per request: 1000
 - Max spans per request: 1000 (implicit from OTLP batch size)
 
 ### 3. Query Handlers (`apps/api/src/routes/query/`)
 
-| Endpoint | Response Shape |
-|----------|--------------|
-| `GET /v1/logs` | `{ data: Log[], pagination: { cursor, hasMore } }` |
-| `GET /v1/traces` | `{ data: TraceSummary[], pagination: { cursor, hasMore } }` |
-| `GET /v1/traces/:traceId` | `{ data: Span[] }` |
-| `GET /v1/metrics` | `{ metric_name, aggregation, interval, data: { timestamp, value }[] }` |
-| `GET /v1/services` | `{ data: Service[] }` |
-| `GET /v1/deployments` | `{ data: DeploymentEvent[], pagination: { cursor, hasMore } }` |
+| Endpoint                  | Response Shape                                                         |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `GET /v1/logs`            | `{ data: Log[], pagination: { cursor, hasMore } }`                     |
+| `GET /v1/traces`          | `{ data: TraceSummary[], pagination: { cursor, hasMore } }`            |
+| `GET /v1/traces/:traceId` | `{ data: Span[] }`                                                     |
+| `GET /v1/metrics`         | `{ metric_name, aggregation, interval, data: { timestamp, value }[] }` |
+| `GET /v1/services`        | `{ data: Service[] }`                                                  |
+| `GET /v1/deployments`     | `{ data: DeploymentEvent[], pagination: { cursor, hasMore } }`         |
 
 **Common query patterns:**
+
 - All queries include `WHERE tenant_id = :tenantId`
 - Default time range: 1 hour (logs, traces, metrics) or 24 hours (services)
 - Cursor-based pagination using `(timestamp, id)` composite cursor
@@ -145,21 +149,21 @@ Transforms OTLP JSON structures into flat canonical model records:
 function normalizeLogRecords(
   resourceLogs: OTLPResourceLogs[],
   tenantId: string,
-  projectId: string
+  projectId: string,
 ): CanonicalLog[];
 
 // Span normalization
 function normalizeSpans(
   resourceSpans: OTLPResourceSpans[],
   tenantId: string,
-  projectId: string
+  projectId: string,
 ): CanonicalSpan[];
 
 // Metric normalization
 function normalizeMetrics(
   resourceMetrics: OTLPResourceMetrics[],
   tenantId: string,
-  projectId: string
+  projectId: string,
 ): CanonicalMetric[];
 ```
 
@@ -194,6 +198,7 @@ function normalizeMetrics(
 ### 5. ClickHouse Client (`apps/api/src/db/clickhouse.ts`)
 
 Uses `@clickhouse/client` with:
+
 - Connection pooling
 - Batch insert via `INSERT INTO ... FORMAT JSONEachRow`
 - Parameterized queries for reads (prevents injection)
@@ -202,6 +207,7 @@ Uses `@clickhouse/client` with:
 ### 6. Postgres Client (`apps/api/src/db/postgres.ts`)
 
 Uses `pg` (node-postgres) with:
+
 - Connection pool (max 10 connections)
 - Parameterized queries
 - Health check: `SELECT 1`
@@ -227,6 +233,7 @@ Client-side data fetching via `fetch()` to the Query API at `http://localhost:40
 ### 8. Shared Types Package (`packages/shared/`)
 
 Exports TypeScript interfaces for:
+
 - Canonical models (Log, Span, Metric, DeploymentEvent)
 - API request/response shapes
 - Query filter types
@@ -375,8 +382,8 @@ export interface CanonicalLog {
   id: string;
   tenant_id: string;
   project_id: string;
-  timestamp: string;       // ISO 8601
-  received_at: string;     // ISO 8601
+  timestamp: string; // ISO 8601
+  received_at: string; // ISO 8601
   service_name: string;
   environment: string;
   source: string;
@@ -448,7 +455,7 @@ export interface CanonicalDeploymentEvent {
 ```typescript
 export interface PaginationParams {
   limit?: number;
-  cursor?: string;  // base64-encoded { ts: string, id: string }
+  cursor?: string; // base64-encoded { ts: string, id: string }
 }
 
 export interface PaginatedResponse<T> {
@@ -462,77 +469,77 @@ export interface PaginatedResponse<T> {
 
 ## Correctness Properties
 
-*A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
+_A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees._
 
 ### Property 1: Ingestion Round-Trip Preservation
 
-*For any* valid telemetry payload (log, span, metric, or deployment event) with any combination of valid field values, ingesting the payload via the corresponding endpoint and then querying it back SHALL produce a record whose canonical fields match the original input values (after normalization).
+_For any_ valid telemetry payload (log, span, metric, or deployment event) with any combination of valid field values, ingesting the payload via the corresponding endpoint and then querying it back SHALL produce a record whose canonical fields match the original input values (after normalization).
 
 **Validates: Requirements 2.1, 3.1, 4.1, 5.1**
 
 ### Property 2: Severity Number Mapping Correctness
 
-*For any* integer value, the severity mapping function SHALL return the correct severity string according to the defined ranges (1-4→TRACE, 5-8→DEBUG, 9-12→INFO, 13-16→WARN, 17-20→ERROR, 21-24→FATAL), and for any value outside 1-24 or absent, SHALL return INFO.
+_For any_ integer value, the severity mapping function SHALL return the correct severity string according to the defined ranges (1-4→TRACE, 5-8→DEBUG, 9-12→INFO, 13-16→WARN, 17-20→ERROR, 21-24→FATAL), and for any value outside 1-24 or absent, SHALL return INFO.
 
 **Validates: Requirements 2.6**
 
 ### Property 3: Span Duration Computation
 
-*For any* span with startTimeUnixNano and endTimeUnixNano where endTimeUnixNano ≥ startTimeUnixNano, the computed duration_ms SHALL equal (endTimeUnixNano - startTimeUnixNano) / 1,000,000 with no precision loss beyond floating-point representation.
+_For any_ span with startTimeUnixNano and endTimeUnixNano where endTimeUnixNano ≥ startTimeUnixNano, the computed duration_ms SHALL equal (endTimeUnixNano - startTimeUnixNano) / 1,000,000 with no precision loss beyond floating-point representation.
 
 **Validates: Requirements 3.1**
 
 ### Property 4: Payload Validation Rejection
 
-*For any* ingestion payload that violates structural validation rules (missing required fields, invalid field types, invalid enum values such as span kind or status_code, non-JSON content), the corresponding endpoint SHALL return HTTP 400 with an error message of at least 10 characters describing the validation failure, and SHALL NOT persist any data from the request.
+_For any_ ingestion payload that violates structural validation rules (missing required fields, invalid field types, invalid enum values such as span kind or status_code, non-JSON content), the corresponding endpoint SHALL return HTTP 400 with an error message of at least 10 characters describing the validation failure, and SHALL NOT persist any data from the request.
 
 **Validates: Requirements 2.2, 3.2, 3.5, 4.2, 5.2, 21.7**
 
 ### Property 5: Missing Field Defaults
 
-*For any* ingestion payload where optional temporal fields are absent (timestamp on logs or deployment events, deployment_id on deployment events), the system SHALL assign server-generated values: current server time for timestamps, and a valid UUID for deployment_id.
+_For any_ ingestion payload where optional temporal fields are absent (timestamp on logs or deployment events, deployment_id on deployment events), the system SHALL assign server-generated values: current server time for timestamps, and a valid UUID for deployment_id.
 
 **Validates: Requirements 2.5, 5.4, 5.5**
 
 ### Property 6: Tenant Data Isolation
 
-*For any* two distinct tenants A and B, and any data ingested under tenant A, querying via tenant B's API key SHALL return zero records belonging to tenant A. Additionally, for any random string that does not match a valid API key, the system SHALL return HTTP 401.
+_For any_ two distinct tenants A and B, and any data ingested under tenant A, querying via tenant B's API key SHALL return zero records belonging to tenant A. Additionally, for any random string that does not match a valid API key, the system SHALL return HTTP 401.
 
 **Validates: Requirements 1.6, 18.1, 18.2, 18.3**
 
 ### Property 7: Cross-Tenant Resource Not-Found
 
-*For any* resource (trace, log, deployment) that exists under tenant A, a direct lookup of that resource's identifier using tenant B's API key SHALL return HTTP 404, indistinguishable from a genuinely non-existent resource.
+_For any_ resource (trace, log, deployment) that exists under tenant A, a direct lookup of that resource's identifier using tenant B's API key SHALL return HTTP 404, indistinguishable from a genuinely non-existent resource.
 
 **Validates: Requirements 18.4, 8.6**
 
 ### Property 8: Query Filtering Correctness
 
-*For any* set of stored telemetry records and any combination of valid filter parameters (time range, service_name, environment, severity, message search, minDuration, metric_name), the query endpoint SHALL return exactly those records that match ALL specified filters, and no records that fail any filter. Text search on message fields SHALL be case-insensitive.
+_For any_ set of stored telemetry records and any combination of valid filter parameters (time range, service_name, environment, severity, message search, minDuration, metric_name), the query endpoint SHALL return exactly those records that match ALL specified filters, and no records that fail any filter. Text search on message fields SHALL be case-insensitive.
 
 **Validates: Requirements 7.3, 7.4, 8.4, 9.3, 10.2, 10.3**
 
 ### Property 9: Cursor-Based Pagination Consistency
 
-*For any* query result set larger than the page size, iterating through all pages using the returned cursor SHALL yield every record exactly once, in timestamp-descending order (or ascending for metrics), with no duplicates and no gaps. The final page SHALL have `hasMore: false`.
+_For any_ query result set larger than the page size, iterating through all pages using the returned cursor SHALL yield every record exactly once, in timestamp-descending order (or ascending for metrics), with no duplicates and no gaps. The final page SHALL have `hasMore: false`.
 
 **Validates: Requirements 7.1, 8.2, 9.5**
 
 ### Property 10: Query Parameter Validation
 
-*For any* query request containing invalid parameter values (malformed ISO-8601 timestamps, negative durations, limit exceeding maximum, unsupported interval or aggregation values, unrecognized severity), the query endpoint SHALL return HTTP 400 with a descriptive error message and SHALL NOT execute any database query.
+_For any_ query request containing invalid parameter values (malformed ISO-8601 timestamps, negative durations, limit exceeding maximum, unsupported interval or aggregation values, unrecognized severity), the query endpoint SHALL return HTTP 400 with a descriptive error message and SHALL NOT execute any database query.
 
 **Validates: Requirements 7.7, 8.7, 9.6**
 
 ### Property 11: Metric Aggregation Correctness
 
-*For any* set of metric data points within a time range and any valid aggregation function (avg, sum, min, max, count) with a valid interval (1m, 5m, 15m, 1h, 1d), the returned aggregated values SHALL equal the mathematical result of applying that function to the data points within each interval bucket.
+_For any_ set of metric data points within a time range and any valid aggregation function (avg, sum, min, max, count) with a valid interval (1m, 5m, 15m, 1h, 1d), the returned aggregated values SHALL equal the mathematical result of applying that function to the data points within each interval bucket.
 
 **Validates: Requirements 9.4**
 
 ### Property 12: Service Catalog Aggregation
 
-*For any* set of telemetry records (logs, spans, metrics) across multiple services, the services endpoint SHALL return one entry per unique (service_name, environment) pair with correct counts (log_count, span_count, metric_count) and the most recent timestamp as last_seen.
+_For any_ set of telemetry records (logs, spans, metrics) across multiple services, the services endpoint SHALL return one entry per unique (service_name, environment) pair with correct counts (log_count, span_count, metric_count) and the most recent timestamp as last_seen.
 
 **Validates: Requirements 10.1**
 
@@ -545,26 +552,26 @@ All API errors follow a consistent JSON structure:
 ```typescript
 interface ErrorResponse {
   error: {
-    code: string;        // Machine-readable error code
-    message: string;     // Human-readable description (≥10 chars per Req 21.7)
-    details?: unknown;   // Optional structured details
+    code: string; // Machine-readable error code
+    message: string; // Human-readable description (≥10 chars per Req 21.7)
+    details?: unknown; // Optional structured details
   };
 }
 ```
 
 ### Error Categories
 
-| HTTP Status | Code | When |
-|-------------|------|------|
-| 400 | `INVALID_PAYLOAD` | Request body fails JSON Schema validation |
-| 400 | `PAYLOAD_TOO_LARGE` | Body exceeds 5 MB |
-| 400 | `RECORD_LIMIT_EXCEEDED` | Log records > 1000 per request |
-| 400 | `INVALID_PARAMETER` | Query parameter fails validation |
-| 401 | `AUTH_REQUIRED` | Missing X-API-Key header |
-| 401 | `AUTH_INVALID` | Key not found in database |
-| 401 | `AUTH_REVOKED` | Key exists but revoked_at is set |
-| 404 | `NOT_FOUND` | Resource doesn't exist (or belongs to another tenant) |
-| 500 | `INTERNAL_ERROR` | Unexpected server error |
+| HTTP Status | Code                    | When                                                  |
+| ----------- | ----------------------- | ----------------------------------------------------- |
+| 400         | `INVALID_PAYLOAD`       | Request body fails JSON Schema validation             |
+| 400         | `PAYLOAD_TOO_LARGE`     | Body exceeds 5 MB                                     |
+| 400         | `RECORD_LIMIT_EXCEEDED` | Log records > 1000 per request                        |
+| 400         | `INVALID_PARAMETER`     | Query parameter fails validation                      |
+| 401         | `AUTH_REQUIRED`         | Missing X-API-Key header                              |
+| 401         | `AUTH_INVALID`          | Key not found in database                             |
+| 401         | `AUTH_REVOKED`          | Key exists but revoked_at is set                      |
+| 404         | `NOT_FOUND`             | Resource doesn't exist (or belongs to another tenant) |
+| 500         | `INTERNAL_ERROR`        | Unexpected server error                               |
 
 ### Error Handling Strategy
 
@@ -594,11 +601,13 @@ interface ErrorResponse {
 **Library**: [fast-check](https://github.com/dubzzz/fast-check) (TypeScript PBT library for Vitest)
 
 **Configuration**:
+
 - Minimum 100 iterations per property test
 - Each property test tagged with: `Feature: rootpilot-phase1-observability-core, Property {N}: {title}`
 - Custom arbitraries for OTLP payload generation
 
 **Property tests cover**:
+
 - Ingestion round-trip (Property 1)
 - Severity mapping (Property 2)
 - Duration computation (Property 3)
@@ -616,13 +625,13 @@ interface ErrorResponse {
 
 Unit tests complement property tests for specific scenarios:
 
-| Area | Tests |
-|------|-------|
-| Auth middleware | Valid key → 202/200, missing key → 401, revoked key → 401 |
-| Default time ranges | Query without time range returns last 1 hour of data |
-| Empty results | Query with no matches returns 200 with empty array |
-| Trace not-found | Non-existent traceId returns 404 |
-| Seed script | Demo tenant, project, and API key exist after seeding |
+| Area                | Tests                                                     |
+| ------------------- | --------------------------------------------------------- |
+| Auth middleware     | Valid key → 202/200, missing key → 401, revoked key → 401 |
+| Default time ranges | Query without time range returns last 1 hour of data      |
+| Empty results       | Query with no matches returns 200 with empty array        |
+| Trace not-found     | Non-existent traceId returns 404                          |
+| Seed script         | Demo tenant, project, and API key exist after seeding     |
 
 ### Integration Tests
 
@@ -667,4 +676,3 @@ apps/web/src/__tests__/
 ├── service-catalog.test.tsx
 └── settings.test.tsx
 ```
-
