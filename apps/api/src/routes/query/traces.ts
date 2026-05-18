@@ -1,4 +1,4 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { authMiddleware } from '../../middleware/auth.js';
 import { getClickHouseClient } from '../../db/clickhouse.js';
 
@@ -36,6 +36,11 @@ interface DecodedCursor {
 function isValidISO8601(value: string): boolean {
   const date = new Date(value);
   return !isNaN(date.getTime()) && value.length > 0;
+}
+
+function toClickHouseDateTime(value: Date | string): string {
+  const raw = value instanceof Date ? value.toISOString() : value;
+  return raw.replace('T', ' ').replace(/Z$/, '');
 }
 
 /**
@@ -79,7 +84,15 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
     '/v1/traces',
     { preHandler: authMiddleware },
     async (request, reply) => {
-      const { from, to, service, environment, minDuration, limit: limitStr, cursor } = request.query;
+      const {
+        from,
+        to,
+        service,
+        environment,
+        minDuration,
+        limit: limitStr,
+        cursor,
+      } = request.query;
       const { tenantId } = request.tenantContext;
 
       // Validate limit
@@ -149,14 +162,14 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
       // Build time range defaults
       const now = new Date();
       const defaultFrom = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
-      const fromTime = from ? new Date(from).toISOString() : defaultFrom.toISOString();
-      const toTime = to ? new Date(to).toISOString() : now.toISOString();
+      const fromTime = toClickHouseDateTime(from ? new Date(from) : defaultFrom);
+      const toTime = toClickHouseDateTime(to ? new Date(to) : now);
 
       // Build WHERE conditions for the spans table
       const conditions: string[] = [
         `tenant_id = {tenantId:String}`,
-        `timestamp >= {fromTime:String}`,
-        `timestamp <= {toTime:String}`,
+        `timestamp >= {fromTime:DateTime64(3)}`,
+        `timestamp <= {toTime:DateTime64(3)}`,
       ];
       const params: Record<string, unknown> = {
         tenantId,
@@ -189,22 +202,21 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
       // Cursor-based pagination: filter after aggregation
       if (decodedCursor) {
         havingConditions.push(
-          `(timestamp < {cursorTs:String} OR (timestamp = {cursorTs:String} AND trace_id < {cursorId:String}))`
+          `(trace_timestamp < {cursorTs:DateTime64(3)} OR (trace_timestamp = {cursorTs:DateTime64(3)} AND trace_id < {cursorId:String}))`,
         );
-        params.cursorTs = decodedCursor.ts;
+        params.cursorTs = toClickHouseDateTime(decodedCursor.ts);
         params.cursorId = decodedCursor.id;
       }
 
-      const havingClause = havingConditions.length > 0
-        ? `HAVING ${havingConditions.join(' AND ')}`
-        : '';
+      const havingClause =
+        havingConditions.length > 0 ? `HAVING ${havingConditions.join(' AND ')}` : '';
 
       // Query to get trace summaries with aggregation
       // Root span is the one with empty parent_span_id
       const queryText = `
         SELECT
           trace_id,
-          min(timestamp) as timestamp,
+          min(timestamp) as trace_timestamp,
           maxIf(service_name, parent_span_id = '') as root_service,
           maxIf(operation_name, parent_span_id = '') as root_operation,
           max(duration_ms) as duration_ms,
@@ -214,14 +226,14 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
         WHERE ${whereClause}
         GROUP BY trace_id
         ${havingClause}
-        ORDER BY timestamp DESC, trace_id DESC
+        ORDER BY trace_timestamp DESC, trace_id DESC
         LIMIT {fetchLimit:UInt32}
       `;
 
       const clickhouse = getClickHouseClient();
       const rows = await clickhouse.query<{
         trace_id: string;
-        timestamp: string;
+        trace_timestamp: string;
         root_service: string;
         root_operation: string;
         duration_ms: number;
@@ -237,7 +249,7 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
       let nextCursor: string | null = null;
       if (hasMore && results.length > 0) {
         const lastRow = results[results.length - 1]!;
-        nextCursor = encodeCursor(lastRow.timestamp, lastRow.trace_id);
+        nextCursor = encodeCursor(lastRow.trace_timestamp, lastRow.trace_id);
       }
 
       // Format response
@@ -245,10 +257,16 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
         trace_id: row.trace_id,
         root_service: row.root_service || '',
         root_operation: row.root_operation || '',
-        duration_ms: typeof row.duration_ms === 'string' ? parseFloat(row.duration_ms as unknown as string) : row.duration_ms,
-        span_count: typeof row.span_count === 'string' ? parseInt(row.span_count as unknown as string, 10) : row.span_count,
+        duration_ms:
+          typeof row.duration_ms === 'string'
+            ? parseFloat(row.duration_ms as unknown as string)
+            : row.duration_ms,
+        span_count:
+          typeof row.span_count === 'string'
+            ? parseInt(row.span_count as unknown as string, 10)
+            : row.span_count,
         status: row.status,
-        timestamp: row.timestamp,
+        timestamp: row.trace_timestamp,
       }));
 
       return reply.status(200).send({
@@ -258,7 +276,7 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
           hasMore,
         },
       });
-    }
+    },
   );
 
   /**
@@ -349,14 +367,17 @@ export async function traceQueryRoutes(app: FastifyInstance): Promise<void> {
         span_id: row.span_id,
         parent_span_id: row.parent_span_id || null,
         operation_name: row.operation_name,
-        duration_ms: typeof row.duration_ms === 'string' ? parseFloat(row.duration_ms as unknown as string) : row.duration_ms,
+        duration_ms:
+          typeof row.duration_ms === 'string'
+            ? parseFloat(row.duration_ms as unknown as string)
+            : row.duration_ms,
         status_code: row.status_code,
         status_message: row.status_message,
         kind: row.kind,
       }));
 
       return reply.status(200).send({ data });
-    }
+    },
   );
 }
 

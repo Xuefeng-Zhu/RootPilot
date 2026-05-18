@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:4000';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api').replace(/\/$/, '');
 const API_KEY = 'rootpilot_demo_key';
 
 interface FetchOptions extends Omit<RequestInit, 'headers'> {
@@ -9,10 +9,7 @@ interface FetchOptions extends Omit<RequestInit, 'headers'> {
  * Shared API client for fetching from the RootPilot Query API.
  * Uses the hardcoded demo API key for authentication.
  */
-export async function apiClient<T>(
-  path: string,
-  options: FetchOptions = {}
-): Promise<T> {
+export async function apiClient<T>(path: string, options: FetchOptions = {}): Promise<T> {
   const { params, ...fetchOptions } = options;
 
   let url = `${API_BASE_URL}${path}`;
@@ -52,7 +49,7 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
-    public readonly body?: unknown
+    public readonly body?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';

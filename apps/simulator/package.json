@@ -1,0 +1,23 @@
+{
+  "name": "@rootpilot/simulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local telemetry simulator for RootPilot Phase 1",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "simulate": "tsx src/index.ts",
+    "build": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rootpilot/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

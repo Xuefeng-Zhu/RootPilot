@@ -49,9 +49,11 @@ describe('SettingsPage', () => {
 
     // Check that curl commands contain the expected elements
     const preElements = container.querySelectorAll('pre');
-    expect(preElements.length).toBe(4); // One for each telemetry type
+    expect(preElements.length).toBeGreaterThanOrEqual(4);
 
-    const allCommandsText = Array.from(preElements).map((el) => el.textContent).join('\n');
+    const allCommandsText = Array.from(preElements)
+      .map((el) => el.textContent)
+      .join('\n');
 
     // Each command should contain the API key
     expect(allCommandsText).toContain('X-API-Key: rootpilot_demo_key');
@@ -72,5 +74,14 @@ describe('SettingsPage', () => {
   it('renders Quick Start Commands section heading', () => {
     render(<SettingsPage />);
     expect(screen.getByText('Quick Start Commands')).toBeInTheDocument();
+  });
+
+  it('renders telemetry simulator commands', () => {
+    render(<SettingsPage />);
+
+    expect(screen.getByText('Telemetry Simulator')).toBeInTheDocument();
+    expect(screen.getByText('Bad Deploy')).toBeInTheDocument();
+    expect(screen.getByText(/npm run simulate -- --scenario normal/)).toBeInTheDocument();
+    expect(screen.getByText(/npm run simulate:dry-run/)).toBeInTheDocument();
   });
 });

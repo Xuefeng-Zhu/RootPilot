@@ -12,7 +12,14 @@
     "test": "vitest run",
     "lint": "eslint . --ext .ts,.tsx,.cjs && prettier --check .",
     "db:init": "npm run db:init --workspace=apps/api",
-    "seed": "npm run seed --workspace=apps/api"
+    "seed": "npm run seed --workspace=apps/api",
+    "simulate": "npm run simulate --workspace=apps/simulator --",
+    "simulate:normal": "npm run simulate -- --scenario normal",
+    "simulate:bad-deploy": "npm run simulate -- --scenario bad-deploy",
+    "simulate:checkout-error": "npm run simulate -- --scenario checkout-error",
+    "simulate:database": "npm run simulate -- --scenario database-degradation",
+    "simulate:cache": "npm run simulate -- --scenario cache-miss-storm",
+    "simulate:dry-run": "npm run simulate -- --dry-run --once"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.0.0",

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../server.js';
 
 // Mock the postgres module for auth middleware
@@ -47,9 +47,14 @@ function mockValidAuth() {
 }
 
 function makeSampleTraceSummary(overrides: Partial<Record<string, unknown>> = {}) {
+  const timestamp =
+    (overrides.trace_timestamp as string) ??
+    (overrides.timestamp as string) ??
+    '2024-01-15T10:30:00.000';
+
   return {
     trace_id: (overrides.trace_id as string) ?? 'trace-abc-123',
-    timestamp: (overrides.timestamp as string) ?? '2024-01-15T10:30:00.000',
+    trace_timestamp: timestamp,
     root_service: (overrides.root_service as string) ?? 'api-gateway',
     root_operation: (overrides.root_operation as string) ?? 'GET /users',
     duration_ms: (overrides.duration_ms as number) ?? 150.5,
@@ -281,8 +286,8 @@ describe('GET /v1/traces', () => {
 
       expect(mockClickhouseQuery).toHaveBeenCalledTimes(1);
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryText).toContain('timestamp >= {fromTime:String}');
-      expect(queryText).toContain('timestamp <= {toTime:String}');
+      expect(queryText).toContain('timestamp >= {fromTime:DateTime64(3)}');
+      expect(queryText).toContain('timestamp <= {toTime:DateTime64(3)}');
       expect(queryParams.fromTime).toBeDefined();
       expect(queryParams.toTime).toBeDefined();
 
@@ -361,8 +366,8 @@ describe('GET /v1/traces', () => {
       });
 
       const [, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryParams.fromTime).toBe('2024-01-15T00:00:00.000Z');
-      expect(queryParams.toTime).toBe('2024-01-15T23:59:59.000Z');
+      expect(queryParams.fromTime).toBe('2024-01-15 00:00:00.000');
+      expect(queryParams.toTime).toBe('2024-01-15 23:59:59.000');
     });
 
     it('uses default limit of 50 when not specified', async () => {
@@ -431,7 +436,7 @@ describe('GET /v1/traces', () => {
         makeSampleTraceSummary({
           trace_id: `trace-${i}`,
           timestamp: `2024-01-15T10:${String(30 - Math.floor(i / 2)).padStart(2, '0')}:00.000`,
-        })
+        }),
       );
       mockClickhouseQuery.mockResolvedValue(rows);
 
@@ -470,7 +475,7 @@ describe('GET /v1/traces', () => {
 
     it('applies cursor to query when provided', async () => {
       const cursor = Buffer.from(
-        JSON.stringify({ ts: '2024-01-15T10:00:00.000', id: 'trace-50' })
+        JSON.stringify({ ts: '2024-01-15T10:00:00.000', id: 'trace-50' }),
       ).toString('base64');
 
       mockClickhouseQuery.mockResolvedValue([]);
@@ -484,7 +489,7 @@ describe('GET /v1/traces', () => {
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
       expect(queryText).toContain('cursorTs');
       expect(queryText).toContain('cursorId');
-      expect(queryParams.cursorTs).toBe('2024-01-15T10:00:00.000');
+      expect(queryParams.cursorTs).toBe('2024-01-15 10:00:00.000');
       expect(queryParams.cursorId).toBe('trace-50');
     });
   });
@@ -503,7 +508,7 @@ describe('GET /v1/traces', () => {
       expect(queryText).toContain('GROUP BY trace_id');
     });
 
-    it('orders results by timestamp DESC, trace_id DESC', async () => {
+    it('orders results by aggregated trace timestamp DESC, trace_id DESC', async () => {
       mockClickhouseQuery.mockResolvedValue([]);
 
       await app.inject({
@@ -513,7 +518,7 @@ describe('GET /v1/traces', () => {
       });
 
       const [queryText] = mockClickhouseQuery.mock.calls[0];
-      expect(queryText).toContain('ORDER BY timestamp DESC, trace_id DESC');
+      expect(queryText).toContain('ORDER BY trace_timestamp DESC, trace_id DESC');
     });
   });
 });
@@ -591,8 +596,16 @@ describe('GET /v1/traces/:traceId', () => {
     it('returns all spans for a trace sorted by start time', async () => {
       const spans = [
         makeSampleSpanRow({ span_id: 'span-001', timestamp: '2024-01-15T10:30:00.000' }),
-        makeSampleSpanRow({ span_id: 'span-002', timestamp: '2024-01-15T10:30:01.000', parent_span_id: 'span-001' }),
-        makeSampleSpanRow({ span_id: 'span-003', timestamp: '2024-01-15T10:30:02.000', parent_span_id: 'span-001' }),
+        makeSampleSpanRow({
+          span_id: 'span-002',
+          timestamp: '2024-01-15T10:30:01.000',
+          parent_span_id: 'span-001',
+        }),
+        makeSampleSpanRow({
+          span_id: 'span-003',
+          timestamp: '2024-01-15T10:30:02.000',
+          parent_span_id: 'span-001',
+        }),
       ];
       mockClickhouseQuery.mockResolvedValue(spans);
 
@@ -656,9 +669,7 @@ describe('GET /v1/traces/:traceId', () => {
     });
 
     it('sets parent_span_id to null for root spans (empty string)', async () => {
-      mockClickhouseQuery.mockResolvedValue([
-        makeSampleSpanRow({ parent_span_id: '' }),
-      ]);
+      mockClickhouseQuery.mockResolvedValue([makeSampleSpanRow({ parent_span_id: '' })]);
 
       const response = await app.inject({
         method: 'GET',
@@ -726,9 +737,7 @@ describe('GET /v1/traces/:traceId', () => {
     });
 
     it('handles string duration_ms from ClickHouse', async () => {
-      mockClickhouseQuery.mockResolvedValue([
-        makeSampleSpanRow({ duration_ms: '300.25' as any }),
-      ]);
+      mockClickhouseQuery.mockResolvedValue([makeSampleSpanRow({ duration_ms: '300.25' as any })]);
 
       const response = await app.inject({
         method: 'GET',
