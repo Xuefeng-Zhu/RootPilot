@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../../lib/api';
 
 interface Service {
@@ -48,10 +48,17 @@ interface HealthInfo {
   errorRate: number | null;
 }
 
+interface ServiceWithHealth {
+  service: Service;
+  health: HealthInfo;
+}
+
+const HEALTH_FILTERS = ['Healthy', 'Degraded', 'Unhealthy', 'No Data'] as const;
+
 function computeHealth(
   service: Service,
   errorLogCounts: Map<string, number>,
-  errorSpanCounts: Map<string, number>
+  errorSpanCounts: Map<string, number>,
 ): HealthInfo {
   const key = `${service.service_name}:${service.environment}`;
   const errorLogs = errorLogCounts.get(key) ?? 0;
@@ -95,6 +102,9 @@ export default function ServicesPage() {
   const [errorSpanCounts, setErrorSpanCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [serviceFilter, setServiceFilter] = useState('');
+  const [environmentFilter, setEnvironmentFilter] = useState('');
+  const [healthFilter, setHealthFilter] = useState('');
 
   useEffect(() => {
     async function fetchServices() {
@@ -173,13 +183,49 @@ export default function ServicesPage() {
     fetchServices();
   }, []);
 
+  const servicesWithHealth = useMemo<ServiceWithHealth[]>(
+    () =>
+      services.map((service) => ({
+        service,
+        health: computeHealth(service, errorLogCounts, errorSpanCounts),
+      })),
+    [errorLogCounts, errorSpanCounts, services],
+  );
+
+  const environments = useMemo(
+    () => [...new Set(services.map((service) => service.environment).filter(Boolean))].sort(),
+    [services],
+  );
+
+  const filteredServices = useMemo(() => {
+    const normalizedServiceFilter = serviceFilter.trim().toLowerCase();
+
+    return servicesWithHealth.filter(({ service, health }) => {
+      const matchesService =
+        normalizedServiceFilter.length === 0 ||
+        service.service_name.toLowerCase().includes(normalizedServiceFilter);
+      const matchesEnvironment =
+        environmentFilter.length === 0 || service.environment === environmentFilter;
+      const matchesHealth = healthFilter.length === 0 || health.label === healthFilter;
+
+      return matchesService && matchesEnvironment && matchesHealth;
+    });
+  }, [environmentFilter, healthFilter, serviceFilter, servicesWithHealth]);
+
+  const hasActiveFilters =
+    serviceFilter.trim().length > 0 || environmentFilter.length > 0 || healthFilter.length > 0;
+
+  const clearFilters = () => {
+    setServiceFilter('');
+    setEnvironmentFilter('');
+    setHealthFilter('');
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-white mb-6">Service Catalog</h1>
 
-      {loading && (
-        <div className="text-gray-400">Loading services...</div>
-      )}
+      {loading && <div className="text-gray-400">Loading services...</div>}
 
       {error && (
         <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
@@ -197,62 +243,118 @@ export default function ServicesPage() {
       )}
 
       {!loading && !error && services.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-400 uppercase border-b border-surface-border">
-              <tr>
-                <th className="px-4 py-3">Service Name</th>
-                <th className="px-4 py-3">Environment</th>
-                <th className="px-4 py-3">Last Seen</th>
-                <th className="px-4 py-3">Health</th>
-                <th className="px-4 py-3">Error Rate</th>
-                <th className="px-4 py-3">Logs</th>
-                <th className="px-4 py-3">Spans</th>
-                <th className="px-4 py-3">Metrics</th>
-              </tr>
-            </thead>
-            <tbody>
-              {services.map((service) => {
-                const health = computeHealth(service, errorLogCounts, errorSpanCounts);
-                return (
-                  <tr
-                    key={`${service.service_name}-${service.environment}`}
-                    className="border-b border-surface-border hover:bg-surface-card/50 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-medium text-white">
-                      {service.service_name}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded text-xs bg-surface-card border border-surface-border text-gray-300">
-                        {service.environment}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400">
-                      {formatTimestamp(service.last_seen)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${health.color}`} />
-                        <span className="text-gray-300">{health.label}</span>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400">
-                      {formatErrorRate(health.errorRate)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-400">
-                      {service.log_count.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-gray-400">
-                      {service.span_count.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-gray-400">
-                      {service.metric_count.toLocaleString()}
-                    </td>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="text"
+              value={serviceFilter}
+              onChange={(event) => setServiceFilter(event.target.value)}
+              placeholder="Filter services..."
+              aria-label="Filter services by name"
+              className="w-64 px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
+            />
+
+            <select
+              value={environmentFilter}
+              onChange={(event) => setEnvironmentFilter(event.target.value)}
+              aria-label="Filter services by environment"
+              className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
+            >
+              <option value="">All Environments</option>
+              {environments.map((environmentName) => (
+                <option key={environmentName} value={environmentName}>
+                  {environmentName}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={healthFilter}
+              onChange={(event) => setHealthFilter(event.target.value)}
+              aria-label="Filter services by health"
+              className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
+            >
+              <option value="">All Health</option>
+              {HEALTH_FILTERS.map((healthLabel) => (
+                <option key={healthLabel} value={healthLabel}>
+                  {healthLabel}
+                </option>
+              ))}
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-400 hover:text-white hover:bg-surface-border transition-colors"
+              >
+                Clear
+              </button>
+            )}
+
+            <div className="ml-auto text-xs text-gray-500">
+              {filteredServices.length} of {services.length} services
+            </div>
+          </div>
+
+          {filteredServices.length === 0 ? (
+            <div className="border border-surface-border rounded p-8 text-center">
+              <p className="text-gray-400 text-sm">No services match the current filters.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-400 uppercase border-b border-surface-border">
+                  <tr>
+                    <th className="px-4 py-3">Service Name</th>
+                    <th className="px-4 py-3">Environment</th>
+                    <th className="px-4 py-3">Last Seen</th>
+                    <th className="px-4 py-3">Health</th>
+                    <th className="px-4 py-3">Error Rate</th>
+                    <th className="px-4 py-3">Logs</th>
+                    <th className="px-4 py-3">Spans</th>
+                    <th className="px-4 py-3">Metrics</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {filteredServices.map(({ service, health }) => (
+                    <tr
+                      key={`${service.service_name}-${service.environment}`}
+                      className="border-b border-surface-border hover:bg-surface-card/50 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium text-white">{service.service_name}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 rounded text-xs bg-surface-card border border-surface-border text-gray-300">
+                          {service.environment}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {formatTimestamp(service.last_seen)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${health.color}`} />
+                          <span className="text-gray-300">{health.label}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {formatErrorRate(health.errorRate)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {service.log_count.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {service.span_count.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {service.metric_count.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
