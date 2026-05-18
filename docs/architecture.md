@@ -42,14 +42,19 @@ graph TB
 
 ### Component Summary
 
-| Component | Technology | Port | Responsibility |
-|-----------|-----------|------|----------------|
-| Ingestion API | Fastify (TypeScript) | 4000 | Receives OTLP telemetry, normalizes, stores in ClickHouse |
-| Query API | Fastify (TypeScript) | 4000 | Serves filtered, paginated queries over stored telemetry |
-| Web UI | Next.js (App Router) | 3000 | Interactive dashboards and explorers for logs, traces, metrics |
-| ClickHouse | ClickHouse (MergeTree) | 8123 | High-volume columnar storage for telemetry data |
-| Postgres | PostgreSQL | 5432 | Tenant metadata, projects, API key management |
+| Component      | Technology              | Port      | Responsibility                                                    |
+| -------------- | ----------------------- | --------- | ----------------------------------------------------------------- |
+| Ingestion API  | Fastify (TypeScript)    | 4000      | Receives OTLP telemetry, normalizes, stores in ClickHouse         |
+| Query API      | Fastify (TypeScript)    | 4000      | Serves filtered, paginated queries over stored telemetry          |
+| Web UI         | Next.js (App Router)    | 3000      | Interactive dashboards and explorers for logs, traces, metrics    |
+| ClickHouse     | ClickHouse (MergeTree)  | 8123      | High-volume columnar storage for telemetry data                   |
+| Postgres       | PostgreSQL              | 5432      | Tenant metadata, projects, API key management                     |
 | OTel Collector | OpenTelemetry Collector | 4317/4318 | Optional — forwards telemetry from instrumented apps to RootPilot |
+
+Current implementation note: `infra/docker-compose.yml` defines API and Web
+services, but `apps/api/Dockerfile` and `apps/web/Dockerfile` are not present in
+this checkout. For local development, run Postgres and ClickHouse with Compose
+and run `apps/api` plus `apps/web` locally. See `docs/development.md`.
 
 ---
 
@@ -119,18 +124,19 @@ sequenceDiagram
 
 ### Endpoints Overview
 
-| Method | Endpoint | Flow | Storage |
-|--------|----------|------|---------|
-| POST | `/v1/ingest/logs` | Ingestion | ClickHouse `rootpilot.logs` |
-| POST | `/v1/ingest/traces` | Ingestion | ClickHouse `rootpilot.spans` |
-| POST | `/v1/ingest/metrics` | Ingestion | ClickHouse `rootpilot.metrics` |
-| POST | `/v1/events/deployments` | Ingestion | ClickHouse `rootpilot.deployment_events` |
-| GET | `/v1/logs` | Query | ClickHouse `rootpilot.logs` |
-| GET | `/v1/traces` | Query | ClickHouse `rootpilot.spans` |
-| GET | `/v1/traces/:traceId` | Query | ClickHouse `rootpilot.spans` |
-| GET | `/v1/metrics` | Query | ClickHouse `rootpilot.metrics` |
-| GET | `/v1/services` | Query | ClickHouse (aggregated) |
-| GET | `/v1/deployments` | Query | ClickHouse `rootpilot.deployment_events` |
+| Method | Endpoint                 | Flow      | Storage                                  |
+| ------ | ------------------------ | --------- | ---------------------------------------- |
+| POST   | `/v1/ingest/logs`        | Ingestion | ClickHouse `rootpilot.logs`              |
+| POST   | `/v1/ingest/traces`      | Ingestion | ClickHouse `rootpilot.spans`             |
+| POST   | `/v1/ingest/metrics`     | Ingestion | ClickHouse `rootpilot.metrics`           |
+| POST   | `/v1/events/deployments` | Ingestion | ClickHouse `rootpilot.deployment_events` |
+| GET    | `/v1/logs`               | Query     | ClickHouse `rootpilot.logs`              |
+| GET    | `/v1/traces`             | Query     | ClickHouse `rootpilot.spans`             |
+| GET    | `/v1/traces/:traceId`    | Query     | ClickHouse `rootpilot.spans`             |
+| GET    | `/v1/metrics`            | Query     | ClickHouse `rootpilot.metrics`           |
+| GET    | `/v1/metrics/names`      | Query     | ClickHouse `rootpilot.metrics`           |
+| GET    | `/v1/services`           | Query     | ClickHouse (aggregated)                  |
+| GET    | `/v1/deployments`        | Query     | ClickHouse `rootpilot.deployment_events` |
 
 ---
 
@@ -165,21 +171,21 @@ graph LR
 
 Postgres stores tenant configuration and API key credentials with ACID guarantees.
 
-| Table | Purpose | Key Fields |
-|-------|---------|-----------|
-| `tenants` | Organizations | id (UUID PK), name, slug (unique), created_at, updated_at |
+| Table      | Purpose                           | Key Fields                                                        |
+| ---------- | --------------------------------- | ----------------------------------------------------------------- |
+| `tenants`  | Organizations                     | id (UUID PK), name, slug (unique), created_at, updated_at         |
 | `projects` | Logical groupings within a tenant | id (UUID PK), tenant_id (FK), name, slug, unique(tenant_id, slug) |
-| `api_keys` | Authentication credentials | id (UUID PK), tenant_id (FK), key_hash, key_prefix, revoked_at |
+| `api_keys` | Authentication credentials        | id (UUID PK), tenant_id (FK), key_hash, key_prefix, revoked_at    |
 
 ### ClickHouse Schema
 
 ClickHouse stores high-volume telemetry using the MergeTree engine optimized for time-series append and analytical queries.
 
-| Table | Engine | Partition | Order | TTL |
-|-------|--------|-----------|-------|-----|
-| `rootpilot.logs` | MergeTree | `toYYYYMM(timestamp)` | `(tenant_id, service_name, timestamp)` | 90 days |
-| `rootpilot.spans` | MergeTree | `toYYYYMM(timestamp)` | `(tenant_id, trace_id, timestamp)` | 90 days |
-| `rootpilot.metrics` | MergeTree | `toYYYYMM(timestamp)` | `(tenant_id, metric_name, timestamp)` | 90 days |
+| Table                         | Engine    | Partition             | Order                                  | TTL     |
+| ----------------------------- | --------- | --------------------- | -------------------------------------- | ------- |
+| `rootpilot.logs`              | MergeTree | `toYYYYMM(timestamp)` | `(tenant_id, service_name, timestamp)` | 90 days |
+| `rootpilot.spans`             | MergeTree | `toYYYYMM(timestamp)` | `(tenant_id, trace_id, timestamp)`     | 90 days |
+| `rootpilot.metrics`           | MergeTree | `toYYYYMM(timestamp)` | `(tenant_id, metric_name, timestamp)`  | 90 days |
 | `rootpilot.deployment_events` | MergeTree | `toYYYYMM(timestamp)` | `(tenant_id, service_name, timestamp)` | 90 days |
 
 **Column type choices:**
@@ -219,13 +225,13 @@ flowchart TD
 
 ### Isolation Guarantees
 
-| Layer | Mechanism | Enforcement |
-|-------|-----------|-------------|
-| **Authentication** | API key → tenant_id lookup | Auth middleware (preHandler hook) rejects requests before any DB operation |
-| **Ingestion** | Every record tagged with `tenant_id` | Normalizers stamp tenant_id from TenantContext onto all canonical records |
-| **Query** | `WHERE tenant_id = :tenantId` in every query | Query handlers inject tenant filter as parameterized value (prevents injection) |
-| **Cross-tenant access** | 404 instead of 403 | Lookup by resource ID returns "not found" if tenant doesn't own the resource |
-| **Client-supplied tenant_id** | Ignored | The system always uses the tenant_id resolved from the API key, never from request params/body |
+| Layer                         | Mechanism                                    | Enforcement                                                                                    |
+| ----------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Authentication**            | API key → tenant_id lookup                   | Auth middleware (preHandler hook) rejects requests before any DB operation                     |
+| **Ingestion**                 | Every record tagged with `tenant_id`         | Normalizers stamp tenant_id from TenantContext onto all canonical records                      |
+| **Query**                     | `WHERE tenant_id = :tenantId` in every query | Query handlers inject tenant filter as parameterized value (prevents injection)                |
+| **Cross-tenant access**       | 404 instead of 403                           | Lookup by resource ID returns "not found" if tenant doesn't own the resource                   |
+| **Client-supplied tenant_id** | Ignored                                      | The system always uses the tenant_id resolved from the API key, never from request params/body |
 
 ### Key Design Decisions
 

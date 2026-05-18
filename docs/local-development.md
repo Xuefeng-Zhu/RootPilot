@@ -1,13 +1,16 @@
 # Local Development Guide
 
+For the broader contributor workflow, see `docs/development.md`. This file keeps
+the local stack notes and API curl examples together.
+
 ## Prerequisites
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Docker | 24+ | Container runtime for infrastructure services |
-| Docker Compose | v2+ | Multi-container orchestration |
-| Node.js | 20+ | JavaScript runtime for API and Web apps |
-| npm | 9+ | Package manager (ships with Node.js) |
+| Tool           | Version | Purpose                                       |
+| -------------- | ------- | --------------------------------------------- |
+| Docker         | 24+     | Container runtime for infrastructure services |
+| Docker Compose | v2+     | Multi-container orchestration                 |
+| Node.js        | 20+     | JavaScript runtime for API and Web apps       |
+| npm            | 9+      | Package manager (ships with Node.js)          |
 
 Verify your environment:
 
@@ -30,27 +33,28 @@ cd RootPilot
 ### 2. Install dependencies
 
 ```bash
-npm install
+npm ci
 ```
 
-This installs all workspace dependencies including `apps/api`, `apps/web`, and `packages/shared`.
+This installs all workspace dependencies from `package-lock.json`, including
+`apps/api`, `apps/web`, and `packages/shared`.
 
-### 3. Start infrastructure services
+### 3. Start database services
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up -d postgres clickhouse
 ```
 
 This starts:
 
-| Service | Port | Description |
-|---------|------|-------------|
-| Postgres | 5432 | Tenant metadata, projects, API keys |
-| ClickHouse | 8123 (HTTP), 9000 (native) | Telemetry storage |
-| API | 4000 | Ingestion and Query API (Fastify) |
-| Web UI | 3000 | Frontend application (Next.js) |
+| Service    | Port                       | Description                         |
+| ---------- | -------------------------- | ----------------------------------- |
+| Postgres   | 5432                       | Tenant metadata, projects, API keys |
+| ClickHouse | 8123 (HTTP), 9000 (native) | Telemetry storage                   |
 
-Services start in dependency order — Postgres and ClickHouse must be healthy before the API starts, and the API must be healthy before the Web UI starts.
+`infra/docker-compose.yml` also defines API and Web services, but this checkout
+does not include `apps/api/Dockerfile` or `apps/web/Dockerfile`. Run the app
+servers locally unless adding those Dockerfiles is part of your task.
 
 ### 4. Initialize databases (alternative to Docker init)
 
@@ -108,14 +112,17 @@ docker compose -f infra/docker-compose.yml down -v
 
 ## Development Workflow
 
-For active development without Docker for the app services, run Postgres and ClickHouse in Docker and the apps locally:
+Run Postgres and ClickHouse in Docker and the apps locally:
 
 ```bash
 # Start only databases
 docker compose -f infra/docker-compose.yml up -d postgres clickhouse
 
-# Run API and Web in dev mode
-npm run dev
+# Terminal 1: API
+npm run dev --workspace=apps/api
+
+# Terminal 2: Web UI
+npm run dev --workspace=apps/web
 ```
 
 ## Running Tests
@@ -124,7 +131,9 @@ npm run dev
 npm run test
 ```
 
-Tests use Fastify `inject()` for HTTP assertions and run against the local database instances.
+API tests use Fastify `inject()` for HTTP assertions. Most route tests mock the
+Postgres and ClickHouse clients, so the unit suite does not require live local
+database instances.
 
 ## Linting
 
@@ -295,6 +304,13 @@ curl -s "http://localhost:4000/v1/traces?minDuration=100&service=api-gateway" \
 ```
 
 #### Query Metrics
+
+List metric names:
+
+```bash
+curl -s "http://localhost:4000/v1/metrics/names" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
 
 Raw data points:
 

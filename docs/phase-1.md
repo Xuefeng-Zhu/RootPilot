@@ -47,14 +47,14 @@ Phase 1 delivers the observability core: an OpenTelemetry-native platform that i
 
 The following are explicitly **not** part of Phase 1:
 
-| Feature | Description |
-|---------|-------------|
-| **AI/ML Investigation** | Automated root cause analysis, anomaly detection, intelligent correlation |
-| **Incident Management** | Alert routing, on-call schedules, incident lifecycle tracking |
-| **Real User Monitoring (RUM)** | Browser performance metrics, session replay, user journey tracking |
-| **Synthetic Monitoring** | Scheduled probes, uptime checks, multi-step transaction monitoring |
-| **Profiling** | Continuous profiling, flame graphs, CPU/memory profiling |
-| **SIEM Integration** | Security event correlation, compliance log forwarding |
-| **Third-Party Integrations** | Slack, PagerDuty, Jira, Datadog, or other external service connectors |
-| **Alerting** | Threshold-based alerts, notification channels, alert rules engine |
-| **SSO/OAuth** | Single sign-on, OAuth2 flows, SAML, external identity providers |
+| Feature                        | Description                                                               |
+| ------------------------------ | ------------------------------------------------------------------------- |
+| **AI/ML Investigation**        | Automated root cause analysis, anomaly detection, intelligent correlation |
+| **Incident Management**        | Alert routing, on-call schedules, incident lifecycle tracking             |
+| **Real User Monitoring (RUM)** | Browser performance metrics, session replay, user journey tracking        |
+| **Synthetic Monitoring**       | Scheduled probes, uptime checks, multi-step transaction monitoring        |
+| **Profiling**                  | Continuous profiling, flame graphs, CPU/memory profiling                  |
+| **SIEM Integration**           | Security event correlation, compliance log forwarding                     |
+| **Third-Party Integrations**   | Slack, PagerDuty, Jira, Datadog, or other external service connectors     |
+| **Alerting**                   | Threshold-based alerts, notification channels, alert rules engine         |
+| **SSO/OAuth**                  | Single sign-on, OAuth2 flows, SAML, external identity providers           |
