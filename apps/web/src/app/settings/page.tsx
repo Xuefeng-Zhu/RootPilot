@@ -120,8 +120,8 @@ const simulatorCommands = [
     inspect: 'Deployments, Service Map, Error Groups, Service Detail',
   },
   {
-    title: 'Refresh Phase 2',
-    command: 'npm run phase2:refresh -- --from now-2h --to now',
+    title: 'Refresh correlations',
+    command: 'npm run correlations:refresh -- --from now-2h --to now',
     inspect: 'Service Map, Services, Error Groups, Deployments',
   },
   {

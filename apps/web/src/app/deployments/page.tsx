@@ -114,7 +114,7 @@ export default function DeploymentsPage() {
         <div className="bg-surface-card border border-surface-border rounded-lg p-8 text-center">
           <p className="text-gray-400">No deployment events found.</p>
           <p className="text-gray-500 text-sm mt-2">
-            Run `npm run simulate:bad-deploy` and `npm run phase2:refresh`.
+            Run `npm run simulate:bad-deploy` and `npm run correlations:refresh`.
           </p>
         </div>
       )}

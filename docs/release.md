@@ -38,7 +38,7 @@ npm run db:migrate
 npm run dev --workspace=apps/api
 npm run seed
 npm run simulate:bad-deploy -- --duration 10m --rate 30
-npm run phase2:refresh -- --from now-2h --to now
+npm run correlations:refresh -- --from now-2h --to now
 curl http://localhost:4000/health
 curl -s http://localhost:4000/v1/services -H "X-API-Key: rootpilot_demo_key"
 ```

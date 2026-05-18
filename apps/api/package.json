@@ -13,11 +13,10 @@
     "db:init": "tsx src/scripts/db-init.ts",
     "db:migrate": "tsx src/scripts/db-migrate.ts",
     "seed": "tsx src/scripts/seed.ts",
-    "graph:build": "tsx src/scripts/phase2-refresh.ts --mode graph",
-    "error-groups:build": "tsx src/scripts/phase2-refresh.ts --mode error-groups",
-    "deployments:analyze": "tsx src/scripts/phase2-refresh.ts --mode deployments",
-    "correlations:refresh": "tsx src/scripts/phase2-refresh.ts --mode all",
-    "phase2:refresh": "tsx src/scripts/phase2-refresh.ts --mode all"
+    "graph:build": "tsx src/scripts/correlation-refresh.ts --mode graph",
+    "error-groups:build": "tsx src/scripts/correlation-refresh.ts --mode error-groups",
+    "deployments:analyze": "tsx src/scripts/correlation-refresh.ts --mode deployments",
+    "correlations:refresh": "tsx src/scripts/correlation-refresh.ts --mode all"
   },
   "dependencies": {
     "@clickhouse/client": "^1.1.0",

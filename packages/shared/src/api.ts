@@ -123,7 +123,7 @@ export interface ServiceListResponse {
 
 export type DeploymentListResponse = PaginatedResponse<CanonicalDeploymentEvent>;
 
-// ─── Phase 2 Service Graph And Correlation Types ────────────────────────────
+// ─── Service Graph And Correlation Types ────────────────────────────────────
 
 export type HealthStatus = 'healthy' | 'warning' | 'degraded' | 'unknown';
 

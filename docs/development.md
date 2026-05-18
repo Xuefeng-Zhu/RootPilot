@@ -148,11 +148,11 @@ npm run build --workspace=apps/web
 npm run typecheck --workspace=packages/shared
 ```
 
-Refresh Phase 2 service graph and correlation data:
+Refresh service graph and correlation data:
 
 ```bash
 npm run simulate:bad-deploy -- --duration 10m --rate 30
-npm run phase2:refresh -- --from now-2h --to now
+npm run correlations:refresh -- --from now-2h --to now
 ```
 
 Use API examples from `docs/local-development.md` for manual smoke checks.

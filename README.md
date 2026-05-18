@@ -22,7 +22,7 @@ In another terminal, after the API is running:
 ```bash
 npm run seed
 npm run simulate -- --once
-npm run phase2:refresh -- --from now-2h --to now
+npm run correlations:refresh -- --from now-2h --to now
 ```
 
 Open `http://localhost:3000`.
@@ -37,7 +37,7 @@ npm run build --workspace=apps/web
 npm run build --workspace=apps/simulator
 npm run typecheck --workspace=packages/shared
 npm run simulate:bad-deploy -- --duration 10m --rate 30
-npm run phase2:refresh -- --from now-2h --to now
+npm run correlations:refresh -- --from now-2h --to now
 ```
 
 ## Documentation
@@ -47,7 +47,7 @@ npm run phase2:refresh -- --from now-2h --to now
 - Development setup: `docs/development.md`
 - Local API examples: `docs/local-development.md`
 - Telemetry simulator: `docs/simulator.md`
-- Phase 2 service graph and correlation ADR: `docs/adr/0002-service-graph-correlation-layer.md`
+- Service graph and correlation ADR: `docs/adr/0002-service-graph-correlation-layer.md`
 - Service graph: `docs/service-graph.md`
 - Correlation: `docs/correlation.md`
 - Testing: `docs/testing.md`

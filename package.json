@@ -18,7 +18,6 @@
     "error-groups:build": "npm run error-groups:build --workspace=apps/api --",
     "deployments:analyze": "npm run deployments:analyze --workspace=apps/api --",
     "correlations:refresh": "npm run correlations:refresh --workspace=apps/api --",
-    "phase2:refresh": "npm run phase2:refresh --workspace=apps/api --",
     "simulate": "npm run simulate --workspace=apps/simulator --",
     "simulate:graph": "npm run simulate -- --scenario multi-service --duration 10m --rate 40",
     "simulate:normal": "npm run simulate -- --scenario normal",

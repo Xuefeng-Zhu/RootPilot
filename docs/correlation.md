@@ -1,7 +1,7 @@
 # Correlation
 
-RootPilot Phase 2 provides deterministic correlation without AI-generated root
-cause analysis.
+RootPilot provides deterministic correlation without AI-generated root cause
+analysis.
 
 ## Error Grouping
 

@@ -54,7 +54,7 @@ Open `/service-map` after running:
 
 ```bash
 npm run simulate:graph
-npm run phase2:refresh -- --from now-2h --to now
+npm run correlations:refresh -- --from now-2h --to now
 ```
 
 Click a node to open service detail. Click an edge to inspect call volume,

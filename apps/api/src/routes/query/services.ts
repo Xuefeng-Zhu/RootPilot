@@ -31,9 +31,9 @@ interface ServiceParams {
 /**
  * Fastify plugin that registers service catalog and service detail routes.
  *
- * Phase 2 reads deterministic service summaries from Postgres. If the graph
+ * Correlation reads deterministic service summaries from Postgres. If the graph
  * refresh job has not been run yet, GET /v1/services falls back to the original
- * live ClickHouse aggregation so Phase 1 local development still feels useful.
+ * live ClickHouse aggregation so local development still feels useful.
  */
 export async function servicesQueryRoute(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: ServicesQuerystring }>(

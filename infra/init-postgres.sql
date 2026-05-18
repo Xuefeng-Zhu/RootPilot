@@ -1,5 +1,5 @@
 -- RootPilot Postgres Initialization
--- Creates tenant metadata and Phase 2 correlation tables.
+-- Creates tenant metadata and correlation tables.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Phase 2 service summaries
+-- Correlation service summaries
 CREATE TABLE IF NOT EXISTS service_summaries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -80,7 +80,7 @@ CREATE INDEX IF NOT EXISTS idx_service_summaries_service
 CREATE INDEX IF NOT EXISTS idx_service_summaries_last_seen
     ON service_summaries (tenant_id, project_id, last_seen_at DESC);
 
--- Phase 2 service dependency edges
+-- Correlation service dependency edges
 CREATE TABLE IF NOT EXISTS service_dependencies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -115,7 +115,7 @@ CREATE INDEX IF NOT EXISTS idx_service_dependencies_target
 CREATE INDEX IF NOT EXISTS idx_service_dependencies_last_seen
     ON service_dependencies (tenant_id, project_id, last_seen_at DESC);
 
--- Phase 2 deterministic error groups
+-- Correlation deterministic error groups
 CREATE TABLE IF NOT EXISTS error_groups (
     id VARCHAR(80) PRIMARY KEY,
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -146,7 +146,7 @@ CREATE INDEX IF NOT EXISTS idx_error_groups_fingerprint
 CREATE INDEX IF NOT EXISTS idx_error_groups_last_seen
     ON error_groups (tenant_id, project_id, last_seen_at DESC);
 
--- Phase 2 deployment impact summaries
+-- Correlation deployment impact summaries
 CREATE TABLE IF NOT EXISTS deployment_impacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,

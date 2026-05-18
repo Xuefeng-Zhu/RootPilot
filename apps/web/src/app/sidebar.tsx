@@ -43,7 +43,7 @@ export function Sidebar() {
       </nav>
 
       <div className="px-5 py-4 border-t border-surface-border">
-        <p className="text-xs text-sidebar-muted">v0.2.0 · Phase 2</p>
+        <p className="text-xs text-sidebar-muted">v0.2.0</p>
       </div>
     </aside>
   );

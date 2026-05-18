@@ -111,7 +111,7 @@ function impactRow() {
   };
 }
 
-function mockValidAuthAndPhase2Rows() {
+function mockValidAuthAndCorrelationRows() {
   mockPgQuery.mockImplementation(async (sql: string) => {
     if (sql.includes('api_keys')) {
       return {
@@ -138,7 +138,7 @@ function mockValidAuthAndPhase2Rows() {
   });
 }
 
-describe('Phase 2 query routes', () => {
+describe('correlation query routes', () => {
   let app: FastifyInstance;
   let clickhouseQuery: ReturnType<typeof vi.fn>;
 
@@ -174,7 +174,7 @@ describe('Phase 2 query routes', () => {
       healthCheck: vi.fn(),
       close: vi.fn(),
     } as any);
-    mockValidAuthAndPhase2Rows();
+    mockValidAuthAndCorrelationRows();
   });
 
   it('returns a tenant-scoped service map', async () => {

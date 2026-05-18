@@ -101,7 +101,7 @@ export default function ServicesPage() {
         <div className="bg-surface-card border border-surface-border rounded-lg p-8 text-center">
           <p className="text-gray-400 text-lg">No services found</p>
           <p className="text-gray-500 text-sm mt-2">
-            Run the simulator and then `npm run phase2:refresh` to populate service summaries.
+            Run the simulator and then `npm run correlations:refresh` to populate service summaries.
           </p>
         </div>
       )}

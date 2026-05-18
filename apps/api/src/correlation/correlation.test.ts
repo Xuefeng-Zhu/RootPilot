@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createErrorFingerprint, normalizeErrorMessage } from './fingerprint.js';
 import { calculateHealthStatus, riskLevelFromImpact } from './health.js';
 
-describe('Phase 2 health and correlation helpers', () => {
+describe('correlation health and impact helpers', () => {
   it('calculates deterministic service health statuses', () => {
     const now = new Date('2026-05-18T12:00:00.000Z');
 

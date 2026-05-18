@@ -111,7 +111,7 @@ function ErrorGroupsContent() {
         <div className="bg-surface-card border border-surface-border rounded-lg p-8 text-center">
           <p className="text-gray-400">No error groups found.</p>
           <p className="text-gray-500 text-sm mt-2">
-            Run a failure scenario, then `npm run phase2:refresh`.
+            Run a failure scenario, then `npm run correlations:refresh`.
           </p>
         </div>
       )}

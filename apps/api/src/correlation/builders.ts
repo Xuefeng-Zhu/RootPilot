@@ -778,7 +778,7 @@ export async function buildDeploymentImpacts(
   return count;
 }
 
-export async function refreshPhase2(options: BuildOptions): Promise<BuildResult> {
+export async function refreshCorrelations(options: BuildOptions): Promise<BuildResult> {
   const serviceSummaries = await buildServiceSummaries(options);
   const serviceDependencies = await buildServiceDependencies(options);
   const errorGroups = await buildErrorGroups(options);

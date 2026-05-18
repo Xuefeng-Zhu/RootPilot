@@ -1,7 +1,8 @@
 # ADR 0002: Service Graph And Correlation Layer
 
-Phase 2 adds a deterministic correlation layer on top of RootPilot's Phase 1
-telemetry ingest and query pipeline.
+RootPilot's correlation layer adds deterministic service graph, error grouping,
+deployment impact, and timeline capabilities on top of the telemetry ingest and
+query pipeline.
 
 It supports:
 
@@ -26,11 +27,11 @@ npm run dev --workspace=apps/api
 npm run dev --workspace=apps/web
 ```
 
-Generate graph-friendly data and refresh Phase 2 aggregates:
+Generate graph-friendly data and refresh correlation aggregates:
 
 ```bash
 npm run simulate:bad-deploy -- --duration 10m --rate 30
-npm run phase2:refresh -- --from now-2h --to now
+npm run correlations:refresh -- --from now-2h --to now
 ```
 
 Open:
@@ -47,7 +48,6 @@ npm run graph:build -- --from now-1h --to now
 npm run error-groups:build -- --from now-1h --to now
 npm run deployments:analyze -- --from now-2h --to now
 npm run correlations:refresh -- --from now-2h --to now
-npm run phase2:refresh -- --from now-2h --to now
 ```
 
 All refresh commands can also accept `--environment production`. Internal
@@ -62,7 +62,7 @@ Raw telemetry remains in ClickHouse:
 - `metrics`
 - `deployment_events`
 
-Phase 2 aggregates are stored in Postgres:
+Correlation aggregates are stored in Postgres:
 
 - `service_summaries`
 - `service_dependencies`
@@ -92,8 +92,8 @@ count, risk level, signals, and example trace IDs.
 - The service map uses a lightweight SVG layout tuned for local 8-12 service
   simulator scenarios.
 
-## Phase 3 Direction
+## AI Investigator Direction
 
-The Phase 2 outputs are designed to become stable inputs for a future AI
+The correlation outputs are designed to become stable inputs for a future AI
 investigator: service graph edges, health summaries, error groups, deployment
 impact summaries, and explainable timeline events.

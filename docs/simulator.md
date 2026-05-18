@@ -143,10 +143,10 @@ After running a scenario, open the local web app and inspect:
 For `bad-deploy`, look for version `v1.4.2`, the deployment event, and the log
 message `PaymentProviderTimeout: timeout exceeded after 500ms`.
 
-For Phase 2 graph and correlation pages, refresh aggregates after simulation:
+For graph and correlation pages, refresh aggregates after simulation:
 
 ```bash
-npm run phase2:refresh -- --from now-2h --to now
+npm run correlations:refresh -- --from now-2h --to now
 ```
 
 ## Troubleshooting
@@ -178,16 +178,16 @@ npm run simulate -- --once --dry-run --verbose
 
 That prints the exact generated payloads without sending them.
 
-## Phase 1 And Future Evolution
+## Observability Core And Future Evolution
 
-For Phase 1, the simulator validates ingestion APIs, ClickHouse telemetry
-storage, Postgres-backed tenant/API-key auth, service discovery, UI filters, and
+The simulator validates ingestion APIs, ClickHouse telemetry storage,
+Postgres-backed tenant/API-key auth, service discovery, UI filters, and
 tenant-scoped query behavior.
 
-For Phase 2, the same scenario patterns populate service graph, error grouping,
-deployment impact, and timeline data. The `bad-deploy`, `checkout-error`,
-`database-degradation`, and `cache-miss-storm` scenarios produce correlated
-data that can later support AI root-cause workflows.
+The same scenario patterns populate service graph, error grouping, deployment
+impact, and timeline data. The `bad-deploy`, `checkout-error`,
+`database-degradation`, and `cache-miss-storm` scenarios produce correlated data
+that can later support AI root-cause workflows.
 
 RootPilot may later support full OTLP protobuf ingestion. At that point, tools
 such as OpenTelemetry `telemetrygen` and the OpenTelemetry Demo can complement

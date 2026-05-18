@@ -109,7 +109,7 @@ export default function ServiceMapPage() {
         <div className="bg-surface-card border border-surface-border rounded-lg p-8 text-center">
           <p className="text-gray-400 text-lg">No service graph data yet</p>
           <p className="text-gray-500 text-sm mt-2">
-            Run `npm run simulate:graph` and `npm run phase2:refresh` to build the map.
+            Run `npm run simulate:graph` and `npm run correlations:refresh` to build the map.
           </p>
         </div>
       )}
