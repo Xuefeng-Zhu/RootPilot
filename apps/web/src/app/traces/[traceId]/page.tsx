@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import type { LogQueryResponse } from '@rootpilot/shared';
 import { apiClient, ApiError } from '../../../lib/api';
 
 interface Span {
@@ -19,6 +20,14 @@ interface Span {
   kind: string;
 }
 
+interface RelatedLog {
+  id: string;
+  span_id: string;
+  message: string;
+  severity: string;
+  timestamp: string;
+}
+
 interface TraceDetailResponse {
   data: Span[];
 }
@@ -28,11 +37,36 @@ interface SpanNode extends Span {
   children: SpanNode[];
 }
 
+function getTraceLogWindow(spans: Span[]): { from: string; to: string } | null {
+  const starts = spans
+    .map((span) => new Date(span.timestamp).getTime())
+    .filter((timestamp) => Number.isFinite(timestamp));
+  if (starts.length === 0) return null;
+
+  const ends = spans
+    .map((span) => {
+      const start = new Date(span.timestamp).getTime();
+      if (!Number.isFinite(start)) return null;
+      return start + Math.max(span.duration_ms, 0);
+    })
+    .filter((timestamp): timestamp is number => timestamp !== null && Number.isFinite(timestamp));
+
+  const paddingMs = 60 * 1000;
+  const from = Math.min(...starts) - paddingMs;
+  const to = Math.max(...(ends.length > 0 ? ends : starts)) + paddingMs;
+
+  return {
+    from: new Date(from).toISOString(),
+    to: new Date(to).toISOString(),
+  };
+}
+
 export default function TraceDetailPage() {
   const params = useParams();
   const traceId = params.traceId as string;
 
   const [spans, setSpans] = useState<Span[]>([]);
+  const [relatedLogs, setRelatedLogs] = useState<RelatedLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +80,27 @@ export default function TraceDetailPage() {
 
         const response = await apiClient<TraceDetailResponse>(`/v1/traces/${traceId}`);
         setSpans(response.data);
+        try {
+          const traceWindow = getTraceLogWindow(response.data);
+          const logsResponse = await apiClient<LogQueryResponse>('/v1/logs', {
+            params: {
+              trace_id: traceId,
+              limit: 200,
+              ...traceWindow,
+            },
+          });
+          setRelatedLogs(
+            logsResponse.data.map((log) => ({
+              id: log.id,
+              span_id: log.span_id,
+              message: log.message,
+              severity: log.severity,
+              timestamp: log.timestamp,
+            })),
+          );
+        } catch {
+          setRelatedLogs([]);
+        }
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           setNotFound(true);
@@ -120,6 +175,17 @@ export default function TraceDetailPage() {
 
     return { flatSpans: flat, traceStart: traceStartMs, traceDuration: totalDuration };
   }, [spans]);
+
+  const logsBySpanId = useMemo(() => {
+    const grouped = new Map<string, RelatedLog[]>();
+    for (const log of relatedLogs) {
+      if (!log.span_id) continue;
+      const current = grouped.get(log.span_id) ?? [];
+      current.push(log);
+      grouped.set(log.span_id, current);
+    }
+    return grouped;
+  }, [relatedLogs]);
 
   function getStatusColor(status: string): string {
     switch (status) {
@@ -216,6 +282,9 @@ export default function TraceDetailPage() {
           <p className="text-sm text-gray-400">
             {spans.length} span{spans.length !== 1 ? 's' : ''} · {formatDuration(traceDuration)}
           </p>
+          <p className="text-xs text-gray-500">
+            {relatedLogs.length} related log{relatedLogs.length !== 1 ? 's' : ''}
+          </p>
         </div>
       </div>
 
@@ -225,6 +294,7 @@ export default function TraceDetailPage() {
         <div className="flex items-center px-4 py-2 bg-surface-card border-b border-surface-border text-xs text-gray-400">
           <div className="w-[300px] shrink-0">Operation</div>
           <div className="flex-1">Timeline</div>
+          <div className="w-[90px] text-right shrink-0">Logs</div>
           <div className="w-[80px] text-right shrink-0">Duration</div>
         </div>
 
@@ -237,6 +307,7 @@ export default function TraceDetailPage() {
               (span.duration_ms / traceDuration) * 100,
               0.5, // minimum width for visibility
             );
+            const spanLogs = logsBySpanId.get(span.span_id) ?? [];
 
             return (
               <div
@@ -272,6 +343,21 @@ export default function TraceDetailPage() {
                       minWidth: '2px',
                     }}
                   />
+                </div>
+
+                {/* Related logs */}
+                <div className="w-[90px] text-right shrink-0 text-xs">
+                  {spanLogs.length > 0 ? (
+                    <Link
+                      href={`/logs?trace_id=${encodeURIComponent(traceId)}&span_id=${encodeURIComponent(span.span_id)}`}
+                      className="text-blue-400 hover:text-blue-300"
+                      title={spanLogs[0]?.message}
+                    >
+                      {spanLogs.length} log{spanLogs.length !== 1 ? 's' : ''}
+                    </Link>
+                  ) : (
+                    <span className="text-gray-600">—</span>
+                  )}
                 </div>
 
                 {/* Duration */}

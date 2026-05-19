@@ -131,6 +131,8 @@ sequenceDiagram
 | POST   | `/v1/ingest/metrics`     | Ingestion | ClickHouse `rootpilot.metrics`           |
 | POST   | `/v1/events/deployments` | Ingestion | ClickHouse `rootpilot.deployment_events` |
 | GET    | `/v1/logs`               | Query     | ClickHouse `rootpilot.logs`              |
+| GET    | `/v1/logs/around`        | Query     | ClickHouse `rootpilot.logs`              |
+| GET    | `/v1/logs/groups`        | Query     | ClickHouse `rootpilot.logs`              |
 | GET    | `/v1/traces`             | Query     | ClickHouse `rootpilot.spans`             |
 | GET    | `/v1/traces/:traceId`    | Query     | ClickHouse `rootpilot.spans`             |
 | GET    | `/v1/metrics`            | Query     | ClickHouse `rootpilot.metrics`           |

@@ -199,6 +199,20 @@ describe('GET /v1/logs', () => {
       expect(body.error.code).toBe('INVALID_PARAMETER');
       expect(body.error.message).toContain('cursor');
     });
+
+    it('returns 400 for malformed attribute_filters', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/logs?attribute_filters=not-json',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      const body = response.json();
+      expect(body.error.code).toBe('INVALID_PARAMETER');
+      expect(body.error.message).toContain('attribute_filters');
+      expect(mockClickhouseQuery).not.toHaveBeenCalled();
+    });
   });
 
   describe('Successful queries', () => {
@@ -270,10 +284,14 @@ describe('GET /v1/logs', () => {
         headers: { 'x-api-key': 'valid-key' },
       });
 
-      expect(mockClickhouseQuery).toHaveBeenCalledTimes(1);
+      expect(mockClickhouseQuery).toHaveBeenCalledTimes(3);
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryText).toContain('timestamp >= {fromTime:String}');
-      expect(queryText).toContain('timestamp <= {toTime:String}');
+      expect(queryText).toContain(
+        "timestamp >= parseDateTime64BestEffort({fromTime:String}, 3, 'UTC')",
+      );
+      expect(queryText).toContain(
+        "timestamp <= parseDateTime64BestEffort({toTime:String}, 3, 'UTC')",
+      );
       expect(queryParams.fromTime).toBeDefined();
       expect(queryParams.toTime).toBeDefined();
 
@@ -354,6 +372,55 @@ describe('GET /v1/logs', () => {
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
       expect(queryText).toContain('positionCaseInsensitive(message, {search:String}) > 0');
       expect(queryParams.search).toBe('error occurred');
+    });
+
+    it('applies trace, span, error type, fingerprint, version, and attribute filters', async () => {
+      mockClickhouseQuery.mockResolvedValue([]);
+      const attributeFilters = encodeURIComponent(
+        JSON.stringify([{ key: 'http.route', value: '/api/checkout' }]),
+      );
+
+      await app.inject({
+        method: 'GET',
+        url: `/v1/logs?trace_id=trace-1&span_id=span-1&error_type=TimeoutError&fingerprint=fp-1&version=v1.2.3&attribute_filters=${attributeFilters}`,
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+      expect(queryText).toContain('trace_id = {traceId:String}');
+      expect(queryText).toContain('span_id = {spanId:String}');
+      expect(queryText).toContain('JSONExtractString(attributes,');
+      expect(queryText).toContain('JSONExtractString(resource_attributes');
+      expect(queryText).toContain('fingerprint !=');
+      expect(queryParams.traceId).toBe('trace-1');
+      expect(queryParams.spanId).toBe('span-1');
+      expect(queryParams.errorType).toBe('TimeoutError');
+      expect(queryParams.fingerprint).toBe('fp-1');
+      expect(queryParams.version).toBe('v1.2.3');
+      expect(queryParams.attributeKey0).toBe('http.route');
+      expect(queryParams.attributeValue0).toBe('/api/checkout');
+    });
+
+    it('returns query summary and facets alongside paginated logs', async () => {
+      mockClickhouseQuery
+        .mockResolvedValueOnce([makeSampleLogRow()])
+        .mockResolvedValueOnce([{ total: '12', error_count: '2', warning_count: '3' }])
+        .mockResolvedValueOnce([{ facet: 'services', value: 'checkout-service', count: '12' }]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/logs',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.summary).toMatchObject({
+        total: 12,
+        error_count: 2,
+        warning_count: 3,
+      });
+      expect(body.facets.services).toEqual([{ value: 'checkout-service', count: 12 }]);
     });
 
     it('accepts valid severity values case-insensitively', async () => {
@@ -456,7 +523,7 @@ describe('GET /v1/logs', () => {
       });
 
       const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
-      expect(queryText).toContain('timestamp < {cursorTs:String}');
+      expect(queryText).toContain('timestamp < parseDateTime64BestEffort({cursorTs:String}');
       expect(queryText).toContain('id < {cursorId:String}');
       expect(queryParams.cursorTs).toBe('2024-01-15T10:00:00.000');
       expect(queryParams.cursorId).toBe('log-50');
@@ -489,6 +556,151 @@ describe('GET /v1/logs', () => {
       const [, queryParams] = mockClickhouseQuery.mock.calls[0];
       expect(queryParams.fromTime).toBe('2024-01-15T00:00:00.000Z');
       expect(queryParams.toTime).toBe('2024-01-15T23:59:59.000Z');
+    });
+  });
+
+  describe('Nearby and grouping endpoints', () => {
+    it('returns 400 for invalid around windows without querying ClickHouse', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/logs/around?timestamp=2024-01-15T10:00:00Z&service=checkout-service&environment=production&before_seconds=0',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.message).toContain('before_seconds');
+      expect(mockClickhouseQuery).not.toHaveBeenCalled();
+    });
+
+    it('queries logs around an explicit timestamp with optional trace scoping', async () => {
+      mockClickhouseQuery.mockResolvedValue([makeSampleLogRow({ trace_id: 'trace-1' })]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/logs/around?timestamp=2024-01-15T10:00:00Z&service=checkout-service&environment=production&trace_id=trace-1',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+      expect(queryText).toContain('service_name = {serviceName:String}');
+      expect(queryText).toContain('environment = {environment:String}');
+      expect(queryText).toContain('trace_id = {traceId:String}');
+      expect(queryParams.serviceName).toBe('checkout-service');
+      expect(queryParams.environment).toBe('production');
+      expect(queryParams.traceId).toBe('trace-1');
+      expect(response.json().data).toHaveLength(1);
+    });
+
+    it('resolves log_id before querying nearby logs', async () => {
+      mockClickhouseQuery
+        .mockResolvedValueOnce([
+          {
+            timestamp: '2024-01-15T10:00:00.000',
+            service_name: 'checkout-service',
+            environment: 'production',
+          },
+        ])
+        .mockResolvedValueOnce([makeSampleLogRow({ id: 'log-id-1' })]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/logs/around?log_id=log-id-1',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(mockClickhouseQuery).toHaveBeenCalledTimes(2);
+      expect(mockClickhouseQuery.mock.calls[0][0]).toContain('id = {logId:String}');
+      expect(mockClickhouseQuery.mock.calls[1][1].serviceName).toBe('checkout-service');
+      expect(response.json().data[0].id).toBe('log-id-1');
+    });
+
+    it('returns grouped logs by effective fingerprint', async () => {
+      mockClickhouseQuery.mockResolvedValueOnce([
+        {
+          fingerprint: 'fp-1',
+          normalized_message: 'payment timeout after <number>ms',
+          example_message: 'payment timeout after 1200ms',
+          count: '4',
+          first_seen_at: '2024-01-15T09:55:00.000',
+          last_seen_at: '2024-01-15T10:05:00.000',
+          service_name: 'checkout-service',
+          severity: 'ERROR',
+          example_trace_id: 'trace-1',
+        },
+      ]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/logs/groups?service=checkout-service&severity=error&search=timeout',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+      expect(queryText).toContain('GROUP BY grouping_fingerprint, service_name, severity');
+      expect(queryParams.serviceName).toBe('checkout-service');
+      expect(queryParams.severity).toBe('ERROR');
+      expect(queryParams.search).toBe('timeout');
+      expect(response.json().data[0]).toMatchObject({
+        fingerprint: 'fp-1',
+        count: 4,
+        example_trace_id: 'trace-1',
+      });
+    });
+
+    it('applies extended filters to grouped logs', async () => {
+      mockClickhouseQuery.mockResolvedValueOnce([
+        {
+          fingerprint: 'fp-1',
+          normalized_message: 'payment timeout after <number>ms',
+          example_message: 'payment timeout after 1200ms',
+          count: '1',
+          first_seen_at: '2024-01-15T09:55:00.000',
+          last_seen_at: '2024-01-15T10:05:00.000',
+          service_name: 'checkout-service',
+          severity: 'ERROR',
+          example_trace_id: 'trace-1',
+        },
+      ]);
+
+      const attributeFilters = encodeURIComponent(
+        JSON.stringify([{ key: 'http.route', value: '/api/checkout' }]),
+      );
+      const response = await app.inject({
+        method: 'GET',
+        url: `/v1/logs/groups?service_name=checkout-service&trace_id=trace-1&span_id=span-1&error_type=TimeoutError&fingerprint=fp-1&version=v1.2.3&attribute_filters=${attributeFilters}`,
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+      expect(queryText).toContain('trace_id = {traceId:String}');
+      expect(queryText).toContain('span_id = {spanId:String}');
+      expect(queryText).toContain('fingerprint, concat');
+      expect(queryText).toContain("JSONExtractString(attributes, 'error.type')");
+      expect(queryText).toContain('JSONExtractString(attributes, {attributeKey0:String})');
+      expect(queryParams.serviceName).toBe('checkout-service');
+      expect(queryParams.traceId).toBe('trace-1');
+      expect(queryParams.spanId).toBe('span-1');
+      expect(queryParams.errorType).toBe('TimeoutError');
+      expect(queryParams.fingerprint).toBe('fp-1');
+      expect(queryParams.version).toBe('v1.2.3');
+      expect(queryParams.attributeKey0).toBe('http.route');
+      expect(queryParams.attributeValue0).toBe('/api/checkout');
+    });
+
+    it('validates malformed attribute filters for grouped logs before querying', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/logs/groups?attribute_filters=not-json',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.message).toContain('attribute_filters');
+      expect(mockClickhouseQuery).not.toHaveBeenCalled();
     });
   });
 });

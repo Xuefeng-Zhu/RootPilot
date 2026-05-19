@@ -739,7 +739,7 @@ describe('Property 8: Query Filtering Correctness', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        expect(mockChQuery).toHaveBeenCalledTimes(1);
+        expect(mockChQuery).toHaveBeenCalledTimes(3);
 
         const [queryText, queryParams] = mockChQuery.mock.calls[0];
 
@@ -1094,7 +1094,7 @@ describe('Property 9: Cursor-Based Pagination Consistency', () => {
           headers: { 'x-api-key': 'valid-key' },
         });
 
-        expect(mockChQuery).toHaveBeenCalledTimes(1);
+        expect(mockChQuery).toHaveBeenCalledTimes(3);
         const [queryText, queryParams] = mockChQuery.mock.calls[0];
 
         // Verify cursor conditions are in the query

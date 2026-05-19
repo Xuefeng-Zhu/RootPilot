@@ -23,9 +23,24 @@ export interface LogQueryFilters {
   service_name?: string;
   environment?: string;
   severity?: LogSeverity;
+  trace_id?: string;
+  span_id?: string;
+  error_type?: string;
+  fingerprint?: string;
+  version?: string;
   search?: string; // case-insensitive text search on message
+  attribute_filters?: LogAttributeFilter[];
   limit?: number;
   cursor?: string;
+}
+
+export interface LogGroupQueryFilters extends Omit<LogQueryFilters, 'cursor'> {
+  service?: string; // Backward-compatible alias for service_name
+}
+
+export interface LogAttributeFilter {
+  key: string;
+  value: string;
 }
 
 export interface TraceQueryFilters {
@@ -65,7 +80,54 @@ export interface DeploymentQueryFilters {
 
 // ─── Response Shape Types ────────────────────────────────────────────────────
 
-export type LogQueryResponse = PaginatedResponse<CanonicalLog>;
+export interface LogSummary {
+  total: number;
+  error_count: number;
+  warning_count: number;
+  from: string;
+  to: string;
+}
+
+export type LogFacetName =
+  | 'services'
+  | 'severities'
+  | 'environments'
+  | 'error_types'
+  | 'http_routes'
+  | 'fingerprints'
+  | 'versions';
+
+export interface LogFacetValue {
+  value: string;
+  count: number;
+}
+
+export type LogFacetCollection = Record<LogFacetName, LogFacetValue[]>;
+
+export interface LogQueryResponse extends PaginatedResponse<CanonicalLog> {
+  summary?: LogSummary;
+  facets?: LogFacetCollection;
+}
+
+export interface LogAroundResponse {
+  data: CanonicalLog[];
+}
+
+export interface LogGroup {
+  fingerprint: string;
+  normalized_message: string;
+  example_message: string;
+  count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  service_name: string;
+  severity: string;
+  example_trace_id: string | null;
+}
+
+export interface LogGroupsResponse {
+  data: LogGroup[];
+}
 
 export interface TraceSummary {
   trace_id: string;
