@@ -125,6 +125,13 @@ npm run dev --workspace=apps/api
 npm run dev --workspace=apps/web
 ```
 
+The web dev server proxies `/api/*` requests to `http://localhost:4000` by default. If
+you run the API on another port for local testing, set `API_PROXY_TARGET`, for example:
+
+```bash
+API_PROXY_TARGET=http://localhost:4010 npm run dev --workspace=apps/web -- --port 3001
+```
+
 ## Running Tests
 
 ```bash
@@ -346,6 +353,27 @@ With aggregation:
 
 ```bash
 curl -s "http://localhost:4000/v1/metrics?metric_name=http.request.duration&interval=5m&aggregation=avg&service=payment-service" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
+
+Metric catalog:
+
+```bash
+curl -s "http://localhost:4000/v1/metrics/catalog" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
+
+Multi-series metric query:
+
+```bash
+curl -s "http://localhost:4000/v1/metrics/http.server.request.duration/series?from=2026-05-18T11:00:00Z&to=2026-05-18T12:00:00Z&interval=1m&aggregation=p95&group_by=service_name" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
+
+Top services for a metric:
+
+```bash
+curl -s "http://localhost:4000/v1/metrics/http.server.request.duration/top-services?from=2026-05-18T11:00:00Z&to=2026-05-18T12:00:00Z" \
   -H "X-API-Key: rootpilot_demo_key"
 ```
 

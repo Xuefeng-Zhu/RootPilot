@@ -369,7 +369,7 @@ describe('GET /v1/metrics', () => {
       expect(queryText).toContain('INTERVAL 5 MINUTE');
       expect(queryText).toContain('sum(value)');
       expect(queryText).toContain('GROUP BY');
-      expect(queryText).toContain('ORDER BY timestamp ASC');
+      expect(queryText).toContain('ORDER BY point_timestamp ASC');
     });
 
     it('uses avg aggregation by default with interval', async () => {
@@ -399,6 +399,173 @@ describe('GET /v1/metrics', () => {
       expect(queryParams.metricName).toBe('cpu.usage');
       expect(queryParams.serviceName).toBe('api');
       expect(queryParams.environment).toBe('prod');
+    });
+  });
+
+  describe('Explorer endpoints', () => {
+    it('returns catalog entries with metric metadata', async () => {
+      mockChQuery.mockResolvedValueOnce([
+        {
+          metric_name: 'http.server.request.duration',
+          metric_type: 'gauge',
+          unit: 'ms',
+          services: ['checkout-service', 'api-gateway'],
+          last_seen: '2026-05-18 12:00:00.000',
+          sample_count: '42',
+          label_keys: ['route', 'status_code'],
+        },
+      ]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/metrics/catalog',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const [queryText, queryParams] = mockChQuery.mock.calls[0];
+      expect(queryText).toContain('tenant_id = {tenantId:String}');
+      expect(queryText).toContain('JSONExtractKeys(labels)');
+      expect(queryParams.tenantId).toBe('tenant-1');
+      expect(response.json().data[0]).toMatchObject({
+        metric_name: 'http.server.request.duration',
+        unit: 'ms',
+        sample_count: 42,
+        label_keys: ['route', 'status_code'],
+      });
+    });
+
+    it('returns metric detail with description and example labels', async () => {
+      mockChQuery.mockResolvedValueOnce([
+        {
+          metric_name: 'checkout.error_rate',
+          metric_type: 'gauge',
+          unit: 'percent',
+          services: ['checkout-service'],
+          last_seen: '2026-05-18 12:00:00.000',
+          sample_count: '3',
+          label_keys: ['route'],
+          latest_value: '0.24',
+          example_labels: JSON.stringify({ route: '/api/checkout' }),
+        },
+      ]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/metrics/checkout.error_rate',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        metric_name: 'checkout.error_rate',
+        unit: 'percent',
+        latest_value: 0.24,
+        example_labels: { route: '/api/checkout' },
+      });
+    });
+
+    it('validates malformed labels before querying explorer series', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/metrics/http.server.request.duration/series?labels=not-json',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.message).toContain('labels');
+      expect(mockChQuery).not.toHaveBeenCalled();
+    });
+
+    it('validates unsafe group_by before querying explorer series', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/metrics/http.server.request.duration/series?group_by=bad%20label',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.message).toContain('group_by');
+      expect(mockChQuery).not.toHaveBeenCalled();
+    });
+
+    it('returns grouped metric series with percentile aggregation and comparison', async () => {
+      mockChQuery
+        .mockResolvedValueOnce([{ unit: 'ms' }])
+        .mockResolvedValueOnce([
+          {
+            timestamp: '2026-05-18T12:00:00.000',
+            series_name: 'checkout-service',
+            value: '231',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            current_avg: '200',
+            previous_avg: '100',
+            current_max: '300',
+            previous_max: '150',
+            current_p95: '250',
+            previous_p95: '100',
+            current_count: '10',
+            previous_count: '8',
+          },
+        ]);
+
+      const labels = encodeURIComponent(JSON.stringify({ route: '/api/checkout' }));
+      const response = await app.inject({
+        method: 'GET',
+        url: `/v1/metrics/http.server.request.duration/series?aggregation=p95&interval=5m&group_by=service_name&service=checkout-service&labels=${labels}`,
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const [, seriesParams] = mockChQuery.mock.calls[1];
+      const [seriesSql] = mockChQuery.mock.calls[1];
+      expect(seriesSql).toContain('quantile(0.95)(value)');
+      expect(seriesSql).toContain('GROUP BY point_timestamp, series_name');
+      expect(seriesParams.metricName).toBe('http.server.request.duration');
+      expect(seriesParams.serviceName).toBe('checkout-service');
+      expect(seriesParams.labelKey0).toBe('route');
+      expect(response.json()).toMatchObject({
+        metric_name: 'http.server.request.duration',
+        unit: 'ms',
+        aggregation: 'p95',
+        interval: '5m',
+        series: [{ name: 'checkout-service' }],
+        comparison: { status: 'Large increase' },
+      });
+    });
+
+    it('returns top services ranked by metric type', async () => {
+      mockChQuery
+        .mockResolvedValueOnce([
+          {
+            service_name: 'checkout-service',
+            latest_value: '210',
+            average: '120',
+            p95: '240',
+            max: '300',
+            last_seen: '2026-05-18 12:00:00.000',
+          },
+        ])
+        .mockResolvedValueOnce([{ unit: 'ms' }]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/metrics/http.server.request.duration/top-services?from=2026-05-18T11:00:00Z&to=2026-05-18T12:00:00Z',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const [queryText, queryParams] = mockChQuery.mock.calls[0];
+      expect(queryText).toContain('ORDER BY p95 DESC');
+      expect(queryParams.tenantId).toBe('tenant-1');
+      expect(response.json().data[0]).toMatchObject({
+        service_name: 'checkout-service',
+        latest_value: 210,
+        p95: 240,
+      });
     });
   });
 });

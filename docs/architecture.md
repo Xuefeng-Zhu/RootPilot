@@ -124,21 +124,26 @@ sequenceDiagram
 
 ### Endpoints Overview
 
-| Method | Endpoint                 | Flow      | Storage                                  |
-| ------ | ------------------------ | --------- | ---------------------------------------- |
-| POST   | `/v1/ingest/logs`        | Ingestion | ClickHouse `rootpilot.logs`              |
-| POST   | `/v1/ingest/traces`      | Ingestion | ClickHouse `rootpilot.spans`             |
-| POST   | `/v1/ingest/metrics`     | Ingestion | ClickHouse `rootpilot.metrics`           |
-| POST   | `/v1/events/deployments` | Ingestion | ClickHouse `rootpilot.deployment_events` |
-| GET    | `/v1/logs`               | Query     | ClickHouse `rootpilot.logs`              |
-| GET    | `/v1/logs/around`        | Query     | ClickHouse `rootpilot.logs`              |
-| GET    | `/v1/logs/groups`        | Query     | ClickHouse `rootpilot.logs`              |
-| GET    | `/v1/traces`             | Query     | ClickHouse `rootpilot.spans`             |
-| GET    | `/v1/traces/:traceId`    | Query     | ClickHouse `rootpilot.spans`             |
-| GET    | `/v1/metrics`            | Query     | ClickHouse `rootpilot.metrics`           |
-| GET    | `/v1/metrics/names`      | Query     | ClickHouse `rootpilot.metrics`           |
-| GET    | `/v1/services`           | Query     | ClickHouse (aggregated)                  |
-| GET    | `/v1/deployments`        | Query     | ClickHouse `rootpilot.deployment_events` |
+| Method | Endpoint                               | Flow      | Storage                                  |
+| ------ | -------------------------------------- | --------- | ---------------------------------------- |
+| POST   | `/v1/ingest/logs`                      | Ingestion | ClickHouse `rootpilot.logs`              |
+| POST   | `/v1/ingest/traces`                    | Ingestion | ClickHouse `rootpilot.spans`             |
+| POST   | `/v1/ingest/metrics`                   | Ingestion | ClickHouse `rootpilot.metrics`           |
+| POST   | `/v1/events/deployments`               | Ingestion | ClickHouse `rootpilot.deployment_events` |
+| GET    | `/v1/logs`                             | Query     | ClickHouse `rootpilot.logs`              |
+| GET    | `/v1/logs/around`                      | Query     | ClickHouse `rootpilot.logs`              |
+| GET    | `/v1/logs/groups`                      | Query     | ClickHouse `rootpilot.logs`              |
+| GET    | `/v1/traces`                           | Query     | ClickHouse `rootpilot.spans`             |
+| GET    | `/v1/traces/:traceId`                  | Query     | ClickHouse `rootpilot.spans`             |
+| GET    | `/v1/metrics`                          | Query     | ClickHouse `rootpilot.metrics`           |
+| GET    | `/v1/metrics/names`                    | Query     | ClickHouse `rootpilot.metrics`           |
+| GET    | `/v1/metrics/catalog`                  | Query     | ClickHouse `rootpilot.metrics`           |
+| GET    | `/v1/metrics/query`                    | Query     | ClickHouse `rootpilot.metrics`           |
+| GET    | `/v1/metrics/:metricName`              | Query     | ClickHouse `rootpilot.metrics`           |
+| GET    | `/v1/metrics/:metricName/series`       | Query     | ClickHouse `rootpilot.metrics`           |
+| GET    | `/v1/metrics/:metricName/top-services` | Query     | ClickHouse `rootpilot.metrics`           |
+| GET    | `/v1/services`                         | Query     | ClickHouse (aggregated)                  |
+| GET    | `/v1/deployments`                      | Query     | ClickHouse `rootpilot.deployment_events` |
 
 ---
 

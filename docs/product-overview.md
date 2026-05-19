@@ -54,11 +54,11 @@ The `/traces/[traceId]` page renders span detail as a waterfall.
 
 The `/metrics` page supports:
 
-- searchable metric name selector
-- time range filter
-- service and environment filters
-- automatic interval selection
-- line chart and values table
+- metric catalog with type, unit, services, sample count, last seen, and label keys
+- query controls for time range, service, environment, aggregation, group-by, labels, and chart type
+- Recharts line and bar charts with multi-series legends and hover tooltips
+- metric detail panel, deterministic baseline comparison, unusual-change badge, and top-services table
+- links into related logs, traces, and service detail pages
 
 ### View services
 
