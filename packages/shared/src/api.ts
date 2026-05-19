@@ -60,8 +60,12 @@ export interface MetricQueryFilters {
   from?: string; // ISO 8601
   to?: string; // ISO 8601
   interval?: '1m' | '5m' | '15m' | '1h' | '1d';
-  aggregation?: 'avg' | 'sum' | 'min' | 'max' | 'count';
+  aggregation?: MetricAggregation;
+  group_by?: string;
+  labels?: Record<string, string>;
 }
+
+export type MetricAggregation = 'avg' | 'sum' | 'min' | 'max' | 'count' | 'p50' | 'p95' | 'p99';
 
 export interface ServiceQueryFilters {
   environment?: string;
@@ -151,10 +155,96 @@ export interface MetricDataPoint {
 }
 
 export interface MetricQueryResponse {
-  metric_name: string;
+  metric_name: string | null;
   aggregation: string;
   interval: string | null;
   data: MetricDataPoint[];
+}
+
+export interface MetricCatalogEntry {
+  metric_name: string;
+  metric_type: string;
+  unit: string;
+  services: string[];
+  last_seen: string;
+  sample_count: number;
+  label_keys: string[];
+}
+
+export interface MetricCatalogResponse {
+  data: MetricCatalogEntry[];
+}
+
+export interface MetricDetailResponse {
+  metric_name: string;
+  description: string;
+  metric_type: string;
+  unit: string;
+  services: string[];
+  label_keys: string[];
+  latest_value: number | null;
+  last_seen: string | null;
+  sample_count: number;
+  example_labels: Record<string, string>;
+}
+
+export interface MetricSeriesPoint {
+  timestamp: string;
+  value: number;
+}
+
+export interface MetricSeries {
+  name: string;
+  labels: Record<string, string>;
+  points: MetricSeriesPoint[];
+}
+
+export interface MetricComparisonValue {
+  current: number;
+  previous: number;
+  delta: number;
+  delta_percent: number | null;
+}
+
+export type MetricChangeStatus = 'Large increase' | 'Large decrease' | 'Stable';
+
+export interface MetricBaselineComparison {
+  from: string;
+  to: string;
+  previous_from: string;
+  previous_to: string;
+  avg: MetricComparisonValue;
+  max: MetricComparisonValue;
+  p95: MetricComparisonValue;
+  count: MetricComparisonValue;
+  status: MetricChangeStatus;
+  summary: string;
+}
+
+export interface MetricSeriesResponse {
+  metric_name: string;
+  unit: string;
+  aggregation: MetricAggregation;
+  interval: string;
+  group_by: string | null;
+  series: MetricSeries[];
+  comparison?: MetricBaselineComparison;
+}
+
+export interface MetricTopService {
+  service_name: string;
+  latest_value: number;
+  average: number;
+  p95: number;
+  max: number;
+  last_seen: string;
+}
+
+export interface MetricTopServicesResponse {
+  metric_name: string;
+  unit: string;
+  aggregation: MetricAggregation;
+  data: MetricTopService[];
 }
 
 export interface ServiceEntry {

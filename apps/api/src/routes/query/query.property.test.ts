@@ -130,7 +130,16 @@ const invalidIntervalArb = fc
   .filter((s) => !['1m', '5m', '15m', '1h', '1d'].includes(s));
 
 /** Generates a valid aggregation */
-const validAggregationArb = fc.constantFrom('avg', 'sum', 'min', 'max', 'count');
+const validAggregationArb = fc.constantFrom(
+  'avg',
+  'sum',
+  'min',
+  'max',
+  'count',
+  'p50',
+  'p95',
+  'p99',
+);
 
 /** Generates an invalid aggregation */
 const invalidAggregationArb = fc
@@ -139,13 +148,19 @@ const invalidAggregationArb = fc
     fc.constant('mode'),
     fc.constant('stddev'),
     fc.constant('percentile'),
-    fc.constant('p99'),
     fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz'.split('')), {
       minLength: 2,
       maxLength: 10,
     }),
   )
-  .filter((s) => !['avg', 'sum', 'min', 'max', 'count'].includes(s));
+  .filter((s) => !['avg', 'sum', 'min', 'max', 'count', 'p50', 'p95', 'p99'].includes(s));
+
+function expectedMetricAggregationSql(aggregation: string): string {
+  if (aggregation === 'p50') return 'quantile(0.50)(value)';
+  if (aggregation === 'p95') return 'quantile(0.95)(value)';
+  if (aggregation === 'p99') return 'quantile(0.99)(value)';
+  return `${aggregation}(value)`;
+}
 
 /** Generates a metric name */
 const metricNameArb = fc.stringOf(
@@ -815,13 +830,18 @@ describe('Property 8: Query Filtering Correctness', () => {
   });
 
   it('passes all metrics filter combinations to ClickHouse correctly', () => {
-    const metricsFilterArb = fc.record({
-      metric_name: fc.option(metricNameArb, { nil: undefined }),
-      service: fc.option(serviceNameArb, { nil: undefined }),
-      environment: fc.option(environmentArb, { nil: undefined }),
-      from: fc.option(validTimestampArb, { nil: undefined }),
-      to: fc.option(validTimestampArb, { nil: undefined }),
-    });
+    const metricsFilterArb = fc
+      .record({
+        metric_name: fc.option(metricNameArb, { nil: undefined }),
+        service: fc.option(serviceNameArb, { nil: undefined }),
+        environment: fc.option(environmentArb, { nil: undefined }),
+        from: fc.option(validTimestampArb, { nil: undefined }),
+        to: fc.option(validTimestampArb, { nil: undefined }),
+      })
+      .filter((filters) => {
+        if (!filters.from || !filters.to) return true;
+        return new Date(filters.from).getTime() <= new Date(filters.to).getTime();
+      });
 
     return fc.assert(
       fc.asyncProperty(metricsFilterArb, async (filters) => {
@@ -1158,11 +1178,11 @@ describe('Property 11: Metric Aggregation Correctness', () => {
         const [queryText] = mockChQuery.mock.calls[0];
 
         // Verify aggregation function is in the query
-        expect(queryText).toContain(`${aggregation}(value)`);
+        expect(queryText).toContain(expectedMetricAggregationSql(aggregation));
         // Verify interval-based grouping is used
         expect(queryText).toContain('toStartOfInterval');
         expect(queryText).toContain('GROUP BY');
-        expect(queryText).toContain('ORDER BY timestamp ASC');
+        expect(queryText).toContain('ORDER BY point_timestamp ASC');
       }),
       { numRuns: 100 },
     );

@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient, ApiError } from '../../lib/api';
 
 interface TraceSummary {
@@ -23,14 +24,59 @@ interface TraceListResponse {
 }
 
 const TIME_RANGE_OPTIONS = [
-  { label: '15m', value: 15 * 60 * 1000 },
-  { label: '1h', value: 60 * 60 * 1000 },
-  { label: '6h', value: 6 * 60 * 60 * 1000 },
-  { label: '24h', value: 24 * 60 * 60 * 1000 },
-  { label: '7d', value: 7 * 24 * 60 * 60 * 1000 },
+  { label: '15m', value: '15m', ms: 15 * 60 * 1000 },
+  { label: '1h', value: '1h', ms: 60 * 60 * 1000 },
+  { label: '6h', value: '6h', ms: 6 * 60 * 60 * 1000 },
+  { label: '24h', value: '24h', ms: 24 * 60 * 60 * 1000 },
+  { label: '7d', value: '7d', ms: 7 * 24 * 60 * 60 * 1000 },
 ];
 
+const DEFAULT_TIME_RANGE = '1h';
+
+function getInitialRange(searchParams: URLSearchParams): string {
+  if (searchParams.get('from') || searchParams.get('to')) return 'custom';
+  const range = searchParams.get('range');
+  return TIME_RANGE_OPTIONS.some((option) => option.value === range) ? range! : DEFAULT_TIME_RANGE;
+}
+
+function isValidDate(value: string): boolean {
+  return value.length > 0 && !Number.isNaN(new Date(value).getTime());
+}
+
+function getTimeWindow(timeRange: string, customFrom: string, customTo: string) {
+  const now = new Date();
+  if (timeRange === 'custom') {
+    const to = isValidDate(customTo) ? new Date(customTo) : now;
+    const from = isValidDate(customFrom)
+      ? new Date(customFrom)
+      : new Date(to.getTime() - 60 * 60 * 1000);
+    return { from: from.toISOString(), to: to.toISOString() };
+  }
+
+  const option =
+    TIME_RANGE_OPTIONS.find((currentOption) => currentOption.value === timeRange) ??
+    TIME_RANGE_OPTIONS[1]!;
+  return {
+    from: new Date(now.getTime() - option.ms).toISOString(),
+    to: now.toISOString(),
+  };
+}
+
+function TracesFallback() {
+  return <div className="text-gray-400 text-sm py-8 text-center">Loading traces...</div>;
+}
+
 export default function TracesPage() {
+  return (
+    <Suspense fallback={<TracesFallback />}>
+      <TracesContent />
+    </Suspense>
+  );
+}
+
+function TracesContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [traces, setTraces] = useState<TraceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +85,21 @@ export default function TracesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   // Filter state
-  const [timeRange, setTimeRange] = useState(60 * 60 * 1000); // default 1h
-  const [service, setService] = useState('');
-  const [minDuration, setMinDuration] = useState('');
+  const [timeRange, setTimeRange] = useState(() =>
+    getInitialRange(searchParams as URLSearchParams),
+  );
+  const [customFrom, setCustomFrom] = useState(() => searchParams.get('from') ?? '');
+  const [customTo, setCustomTo] = useState(() => searchParams.get('to') ?? '');
+  const [service, setService] = useState(
+    () => searchParams.get('service') ?? searchParams.get('service_name') ?? '',
+  );
+  const [environment, setEnvironment] = useState(() => searchParams.get('environment') ?? '');
+  const [minDuration, setMinDuration] = useState(() => searchParams.get('minDuration') ?? '');
+
+  const timeWindow = useMemo(
+    () => getTimeWindow(timeRange, customFrom, customTo),
+    [customFrom, customTo, timeRange],
+  );
 
   const fetchTraces = useCallback(
     async (paginationCursor?: string) => {
@@ -53,18 +111,18 @@ export default function TracesPage() {
           setError(null);
         }
 
-        const now = new Date();
-        const from = new Date(now.getTime() - timeRange).toISOString();
-        const to = now.toISOString();
-
         const params: Record<string, string | number | boolean | undefined> = {
-          from,
-          to,
+          from: timeWindow.from,
+          to: timeWindow.to,
           limit: 50,
         };
 
         if (service) {
           params.service = service;
+        }
+
+        if (environment) {
+          params.environment = environment;
         }
 
         if (minDuration && Number(minDuration) > 0) {
@@ -93,12 +151,34 @@ export default function TracesPage() {
         setLoadingMore(false);
       }
     },
-    [timeRange, service, minDuration],
+    [environment, minDuration, service, timeWindow.from, timeWindow.to],
   );
 
   useEffect(() => {
     fetchTraces();
   }, [fetchTraces]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (timeRange === 'custom') {
+      if (customFrom) params.set('from', customFrom);
+      if (customTo) params.set('to', customTo);
+    } else {
+      params.set('range', timeRange);
+    }
+    if (service) params.set('service', service);
+    if (environment) params.set('environment', environment);
+    if (minDuration) params.set('minDuration', minDuration);
+
+    const nextUrl = params.toString() ? `/traces?${params.toString()}` : '/traces';
+    router.replace(nextUrl, { scroll: false });
+  }, [customFrom, customTo, environment, minDuration, router, service, timeRange]);
+
+  function selectTimeRange(nextRange: string) {
+    setTimeRange(nextRange);
+    setCustomFrom('');
+    setCustomTo('');
+  }
 
   function handleLoadMore() {
     if (cursor) {
@@ -130,7 +210,7 @@ export default function TracesPage() {
             {TIME_RANGE_OPTIONS.map((opt) => (
               <button
                 key={opt.label}
-                onClick={() => setTimeRange(opt.value)}
+                onClick={() => selectTimeRange(opt.value)}
                 className={`px-3 py-1.5 text-sm transition-colors ${
                   timeRange === opt.value
                     ? 'bg-sidebar-active text-white'
@@ -140,6 +220,9 @@ export default function TracesPage() {
                 {opt.label}
               </button>
             ))}
+            {timeRange === 'custom' && (
+              <span className="px-3 py-1.5 text-sm bg-sidebar-active text-white">Custom</span>
+            )}
           </div>
         </div>
 
@@ -151,6 +234,18 @@ export default function TracesPage() {
             value={service}
             onChange={(e) => setService(e.target.value)}
             placeholder="All services"
+            className="px-3 py-1.5 text-sm bg-surface-card border border-surface-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        {/* Environment Filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-400">Environment</label>
+          <input
+            type="text"
+            value={environment}
+            onChange={(e) => setEnvironment(e.target.value)}
+            placeholder="All environments"
             className="px-3 py-1.5 text-sm bg-surface-card border border-surface-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
           />
         </div>

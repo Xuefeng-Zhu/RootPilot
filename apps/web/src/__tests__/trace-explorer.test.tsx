@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import TracesPage from '../app/traces/page';
 import TraceDetailPage from '../app/traces/[traceId]/page';
 
 // Mock the API client
@@ -21,6 +22,9 @@ vi.mock('../lib/api', () => ({
 import { apiClient } from '../lib/api';
 const mockApiClient = vi.mocked(apiClient);
 const mockUseParams = vi.mocked(useParams);
+const mockUseRouter = vi.mocked(useRouter);
+const mockUseSearchParams = vi.mocked(useSearchParams);
+const mockReplace = vi.fn();
 
 const mockSpans = [
   {
@@ -68,6 +72,12 @@ describe('TraceDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseParams.mockReturnValue({ traceId: 'trace-abc' });
+    mockUseRouter.mockReturnValue({
+      push: vi.fn(),
+      replace: mockReplace,
+      back: vi.fn(),
+    });
+    mockUseSearchParams.mockReturnValue(new URLSearchParams());
   });
 
   it('renders span waterfall with correct positioning and colors', async () => {
@@ -204,6 +214,70 @@ describe('TraceDetailPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Failed to fetch trace details')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('TracesPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseParams.mockReturnValue({ traceId: 'trace-abc' });
+    mockUseRouter.mockReturnValue({
+      push: vi.fn(),
+      replace: mockReplace,
+      back: vi.fn(),
+    });
+    mockUseSearchParams.mockReturnValue(new URLSearchParams());
+  });
+
+  it('hydrates trace filters from URL params for metrics drilldowns', async () => {
+    const from = '2026-05-18T07:00:00.000Z';
+    const to = '2026-05-19T07:00:00.000Z';
+    mockUseSearchParams.mockReturnValue(
+      new URLSearchParams({
+        from,
+        to,
+        service: 'db-service',
+        environment: 'production',
+      }),
+    );
+    mockApiClient.mockResolvedValue({
+      data: [
+        {
+          trace_id: 'trace-db',
+          root_service: 'db-service',
+          root_operation: 'SELECT checkout',
+          duration_ms: 120,
+          span_count: 3,
+          status: 'OK',
+          timestamp: '2026-05-18T07:30:00.000Z',
+        },
+      ],
+      pagination: { cursor: null, hasMore: false },
+    });
+
+    render(<TracesPage />);
+
+    await waitFor(() => {
+      expect(mockApiClient).toHaveBeenCalledWith(
+        '/v1/traces',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            from,
+            to,
+            service: 'db-service',
+            environment: 'production',
+            limit: 50,
+          }),
+        }),
+      );
+    });
+
+    expect(screen.getByDisplayValue('db-service')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('production')).toBeInTheDocument();
+    expect(screen.getByText('Custom')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('SELECT checkout')).toBeInTheDocument();
     });
   });
 });
