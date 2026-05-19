@@ -39,16 +39,8 @@ export default function ErrorGroupDetailPage() {
         const detail = await apiClient<ErrorGroupDetailResponse>(
           `/v1/error-groups/${encodeURIComponent(id)}`,
         );
-        const relatedLogWindow = getRelatedLogWindow(detail.data);
         const relatedLogs = await apiClient<ListResponse<CanonicalLog>>('/v1/logs', {
-          params: {
-            fingerprint: detail.data.fingerprint,
-            service_name: detail.data.service_name,
-            environment: detail.data.environment,
-            from: relatedLogWindow.from,
-            to: relatedLogWindow.to,
-            limit: 25,
-          },
+          params: buildRelatedLogQueryParams(detail.data),
         }).catch(() => ({ data: [] }));
         setGroup(detail.data);
         setLogs(relatedLogs.data);
@@ -212,20 +204,43 @@ export default function ErrorGroupDetailPage() {
   );
 }
 
-const RELATED_LOG_WINDOW_BUFFER_MS = 5 * 60 * 1000;
+interface RelatedLogQueryParams extends Record<string, string | number> {
+  fingerprint: string;
+  service_name: string;
+  environment: string;
+  from: string;
+  to: string;
+  limit: number;
+}
 
-function getRelatedLogWindow(group: ErrorGroup): { from: string; to: string } {
-  const firstSeen = new Date(group.first_seen_at).getTime();
-  const lastSeen = new Date(group.last_seen_at).getTime();
-  const now = Date.now();
-  const from = Number.isFinite(firstSeen)
-    ? firstSeen - RELATED_LOG_WINDOW_BUFFER_MS
-    : now - 60 * 60 * 1000;
-  const to = Number.isFinite(lastSeen) ? lastSeen + RELATED_LOG_WINDOW_BUFFER_MS : now;
+const RELATED_LOG_WINDOW_BUFFER_MS = 5 * 60 * 1000;
+const DEFAULT_RELATED_LOG_WINDOW_MS = 60 * 60 * 1000;
+
+function buildRelatedLogQueryParams(group: ErrorGroup): RelatedLogQueryParams {
+  const window = getBufferedErrorGroupWindow(group);
 
   return {
-    from: new Date(Math.max(0, from)).toISOString(),
-    to: new Date(Math.max(from, to)).toISOString(),
+    fingerprint: group.fingerprint,
+    service_name: group.service_name,
+    environment: group.environment,
+    from: window.from,
+    to: window.to,
+    limit: 25,
+  };
+}
+
+function getBufferedErrorGroupWindow(group: ErrorGroup): { from: string; to: string } {
+  const firstSeen = Date.parse(group.first_seen_at);
+  const lastSeen = Date.parse(group.last_seen_at);
+  const now = Date.now();
+  const baseStart = Number.isFinite(firstSeen) ? firstSeen : now - DEFAULT_RELATED_LOG_WINDOW_MS;
+  const baseEnd = Number.isFinite(lastSeen) ? lastSeen : baseStart + DEFAULT_RELATED_LOG_WINDOW_MS;
+  const windowStart = Math.min(baseStart, baseEnd);
+  const windowEnd = Math.max(baseStart, baseEnd);
+
+  return {
+    from: new Date(Math.max(0, windowStart - RELATED_LOG_WINDOW_BUFFER_MS)).toISOString(),
+    to: new Date(windowEnd + RELATED_LOG_WINDOW_BUFFER_MS).toISOString(),
   };
 }
 
