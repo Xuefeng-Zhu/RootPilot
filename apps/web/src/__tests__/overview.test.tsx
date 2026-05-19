@@ -236,7 +236,13 @@ describe('OverviewPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/no deployment events/i)).toBeInTheDocument();
       expect(screen.getByText(/no error-severity log entries/i)).toBeInTheDocument();
+      expect(screen.getByText(/no active error groups/i)).toBeInTheDocument();
+      expect(screen.getByText(/no services found/i)).toBeInTheDocument();
     });
+
+    expect(screen.queryByText('High error rate in checkout-service')).not.toBeInTheDocument();
+    expect(screen.queryByText('checkout-service')).not.toBeInTheDocument();
+    expect(screen.queryByText('deploy_checkout_demo')).not.toBeInTheDocument();
   });
 
   it('renders error state when API call fails', async () => {

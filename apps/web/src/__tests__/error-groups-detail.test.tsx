@@ -94,5 +94,17 @@ describe('ErrorGroupDetailPage', () => {
     expect(screen.getByText('Open example trace')).toHaveAttribute('href', '/traces/trace-123');
     expect(screen.getAllByText('Payment authorization failed: timeout').length).toBeGreaterThan(0);
     expect(screen.getByText('Open trace')).toHaveAttribute('href', '/traces/trace-123');
+    expect(mockApiClient).toHaveBeenCalledWith(
+      '/v1/logs',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          fingerprint: 'fingerprint-123',
+          service_name: 'checkout-service',
+          environment: 'production',
+          from: '2026-05-18T11:55:00.000Z',
+          to: '2026-05-18T12:35:00.000Z',
+        }),
+      }),
+    );
   });
 });

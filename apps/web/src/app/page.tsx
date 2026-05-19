@@ -21,7 +21,7 @@ import type {
 } from '@rootpilot/shared';
 import { apiClient } from '../lib/api';
 import { formatMs, formatPercent, formatTimestamp } from '../lib/format';
-import { activeIssues, fallbackServices, overviewSeries } from '../lib/mock-data/overview';
+import { overviewSeries } from '../lib/mock-data/overview';
 import {
   EmptyState,
   ErrorState,
@@ -93,12 +93,11 @@ export default function OverviewPage() {
     fetchData();
   }, []);
 
-  const services = state?.services.length ? state.services : fallbackServices.map(normalizeService);
+  const services = state?.services ?? [];
   const deployments = state?.deployments ?? [];
   const errorLogs = state?.errorLogs ?? [];
   const issues = useMemo(() => {
-    if (!state?.errorGroups.length) return activeIssues;
-    return state.errorGroups.slice(0, 3).map((group) => ({
+    return (state?.errorGroups ?? []).slice(0, 3).map((group) => ({
       title: group.error_type ?? group.normalized_message,
       service: group.service_name,
       severity: group.severity === 'ERROR' ? 'P2' : 'P3',
@@ -187,19 +186,21 @@ export default function OverviewPage() {
         </StatCard>
         <StatCard
           label="Recent Deployments"
-          value={deployments.length || 3}
+          value={deployments.length}
           delta="last 24h"
           tone="good"
         >
           <div className="space-y-1.5 text-xs text-slate-400">
-            {(deployments.length ? deployments : fallbackDeployments())
-              .slice(0, 3)
-              .map((deployment) => (
+            {deployments.length === 0 ? (
+              <p className="text-slate-500">No deployment telemetry</p>
+            ) : (
+              deployments.slice(0, 3).map((deployment) => (
                 <div key={deployment.deployment_id} className="flex justify-between gap-2">
                   <span className="truncate">{deployment.service_name}</span>
                   <span className="text-slate-500">{deployment.version}</span>
                 </div>
-              ))}
+              ))
+            )}
           </div>
         </StatCard>
       </div>
@@ -260,23 +261,32 @@ export default function OverviewPage() {
 
         <div className="space-y-5">
           <Panel title="Active Issues">
-            <div className="space-y-3 p-4">
-              {issues.map((issue) => (
-                <Link
-                  key={`${issue.title}-${issue.service}`}
-                  href={`/error-groups?service=${encodeURIComponent(issue.service)}`}
-                  className="block rounded-md border border-surface-border bg-surface-subtle p-3 transition-colors hover:border-amber-400/40"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-medium text-slate-100">{issue.title}</p>
-                    <StatusBadge status={issue.severity} />
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {issue.service} · {issue.age}
-                  </p>
-                </Link>
-              ))}
-            </div>
+            {issues.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  title="No active error groups"
+                  description="Run npm run simulate:bad-deploy to generate incident-like demo telemetry."
+                />
+              </div>
+            ) : (
+              <div className="space-y-3 p-4">
+                {issues.map((issue) => (
+                  <Link
+                    key={`${issue.title}-${issue.service}`}
+                    href={`/error-groups?service=${encodeURIComponent(issue.service)}`}
+                    className="block rounded-md border border-surface-border bg-surface-subtle p-3 transition-colors hover:border-amber-400/40"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-medium text-slate-100">{issue.title}</p>
+                      <StatusBadge status={issue.severity} />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {issue.service} · {issue.age}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            )}
           </Panel>
 
           <Panel title="Recent Deployments">
@@ -326,39 +336,48 @@ export default function OverviewPage() {
             </Link>
           }
         >
-          <div className="overflow-x-auto">
-            <table className="rp-table">
-              <thead>
-                <tr>
-                  <th>Service</th>
-                  <th>Status</th>
-                  <th>P95 Latency</th>
-                  <th>Error Rate</th>
-                  <th>Requests/min</th>
-                </tr>
-              </thead>
-              <tbody>
-                {services.slice(0, 6).map((service) => (
-                  <tr key={`${service.service_name}-${service.environment}`}>
-                    <td>
-                      <Link
-                        href={`/services/${encodeURIComponent(service.service_name)}?environment=${encodeURIComponent(service.environment)}`}
-                        className="font-medium text-white hover:text-cyan-300"
-                      >
-                        {service.service_name}
-                      </Link>
-                    </td>
-                    <td>
-                      <HealthBadge status={service.health_status} />
-                    </td>
-                    <td>{formatMs(service.p95_latency_ms)}</td>
-                    <td>{formatPercent(service.error_count, service.request_count)}</td>
-                    <td>{formatCompact(Math.round(service.request_count / 60))}</td>
+          {services.length === 0 ? (
+            <div className="p-4">
+              <EmptyState
+                title="No services found"
+                description="Send telemetry or run npm run seed to populate the service catalog."
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="rp-table">
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Status</th>
+                    <th>P95 Latency</th>
+                    <th>Error Rate</th>
+                    <th>Requests/min</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {services.slice(0, 6).map((service) => (
+                    <tr key={`${service.service_name}-${service.environment}`}>
+                      <td>
+                        <Link
+                          href={`/services/${encodeURIComponent(service.service_name)}?environment=${encodeURIComponent(service.environment)}`}
+                          className="font-medium text-white hover:text-cyan-300"
+                        >
+                          {service.service_name}
+                        </Link>
+                      </td>
+                      <td>
+                        <HealthBadge status={service.health_status} />
+                      </td>
+                      <td>{formatMs(service.p95_latency_ms)}</td>
+                      <td>{formatPercent(service.error_count, service.request_count)}</td>
+                      <td>{formatCompact(Math.round(service.request_count / 60))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Panel>
       </div>
 
@@ -444,35 +463,4 @@ function formatCompact(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
   return Math.round(value).toLocaleString();
-}
-
-function fallbackDeployments(): CanonicalDeploymentEvent[] {
-  return [
-    {
-      deployment_id: 'deploy_checkout_demo',
-      tenant_id: 'demo',
-      project_id: 'demo',
-      timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-      service_name: 'checkout-service',
-      environment: 'production',
-      version: 'v2.14.3',
-      git_sha: 'a1b2c3d',
-      deployed_by: 'deploy-bot',
-      provider: 'github-actions',
-      metadata: {},
-    },
-    {
-      deployment_id: 'deploy_payment_demo',
-      tenant_id: 'demo',
-      project_id: 'demo',
-      timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-      service_name: 'payment-service',
-      environment: 'production',
-      version: 'v0.8.7',
-      git_sha: 'f1e2d3c',
-      deployed_by: 'deploy-bot',
-      provider: 'github-actions',
-      metadata: {},
-    },
-  ];
 }

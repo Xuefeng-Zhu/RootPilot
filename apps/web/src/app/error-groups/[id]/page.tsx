@@ -39,11 +39,14 @@ export default function ErrorGroupDetailPage() {
         const detail = await apiClient<ErrorGroupDetailResponse>(
           `/v1/error-groups/${encodeURIComponent(id)}`,
         );
+        const relatedLogWindow = getRelatedLogWindow(detail.data);
         const relatedLogs = await apiClient<ListResponse<CanonicalLog>>('/v1/logs', {
           params: {
             fingerprint: detail.data.fingerprint,
             service_name: detail.data.service_name,
             environment: detail.data.environment,
+            from: relatedLogWindow.from,
+            to: relatedLogWindow.to,
             limit: 25,
           },
         }).catch(() => ({ data: [] }));
@@ -207,6 +210,23 @@ export default function ErrorGroupDetailPage() {
       </Panel>
     </div>
   );
+}
+
+const RELATED_LOG_WINDOW_BUFFER_MS = 5 * 60 * 1000;
+
+function getRelatedLogWindow(group: ErrorGroup): { from: string; to: string } {
+  const firstSeen = new Date(group.first_seen_at).getTime();
+  const lastSeen = new Date(group.last_seen_at).getTime();
+  const now = Date.now();
+  const from = Number.isFinite(firstSeen)
+    ? firstSeen - RELATED_LOG_WINDOW_BUFFER_MS
+    : now - 60 * 60 * 1000;
+  const to = Number.isFinite(lastSeen) ? lastSeen + RELATED_LOG_WINDOW_BUFFER_MS : now;
+
+  return {
+    from: new Date(Math.max(0, from)).toISOString(),
+    to: new Date(Math.max(from, to)).toISOString(),
+  };
 }
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {
