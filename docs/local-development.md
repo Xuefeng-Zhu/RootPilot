@@ -333,6 +333,27 @@ curl -s "http://localhost:4000/v1/traces?minDuration=100&service=api-gateway" \
   -H "X-API-Key: rootpilot_demo_key"
 ```
 
+Filter by trace fields and return latency buckets:
+
+```bash
+curl -s "http://localhost:4000/v1/traces?service=checkout-service&environment=production&operation=checkout&status=ERROR&error_only=true&http_route=%2Fapi%2Fcheckout" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
+
+Fetch logs for a trace, optionally scoped to one span:
+
+```bash
+curl -s "http://localhost:4000/v1/traces/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/logs?span_id=span_123" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
+
+Find similar traces for the same root service, root operation, and environment:
+
+```bash
+curl -s "http://localhost:4000/v1/traces/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4/similar?from=2024-01-15T00:00:00Z&to=2024-01-16T00:00:00Z&limit=10" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
+
 #### Query Metrics
 
 List metric names:

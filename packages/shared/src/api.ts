@@ -48,7 +48,14 @@ export interface TraceQueryFilters {
   to?: string; // ISO 8601
   service?: string;
   environment?: string;
+  operation?: string;
+  status?: 'OK' | 'ERROR';
   minDuration?: number; // milliseconds
+  maxDuration?: number; // milliseconds
+  trace_id?: string;
+  root_service?: string;
+  http_route?: string;
+  error_only?: boolean;
   limit?: number;
   cursor?: string;
 }
@@ -137,16 +144,82 @@ export interface TraceSummary {
   trace_id: string;
   root_service: string;
   root_operation: string;
+  start_time: string; // ISO 8601
+  timestamp: string; // ISO 8601, backward-compatible alias for start_time
   duration_ms: number;
   span_count: number;
+  error_count: number;
+  services: string[];
   status: string;
-  timestamp: string; // ISO 8601
+  near_deployment: boolean;
+  deployment_id?: string | null;
 }
 
-export type TraceListResponse = PaginatedResponse<TraceSummary>;
+export interface TraceLatencyBucket {
+  bucket: '<100ms' | '100-300ms' | '300-1000ms' | '1-3s' | '>3s';
+  count: number;
+}
+
+export interface TraceListSummary {
+  latency_buckets: TraceLatencyBucket[];
+}
+
+export interface TraceListResponse extends PaginatedResponse<TraceSummary> {
+  summary?: TraceListSummary;
+}
+
+export interface TraceDeploymentHint {
+  near_deployment: boolean;
+  deployment_id: string | null;
+}
+
+export interface TraceServiceBreakdown {
+  service_name: string;
+  total_time_ms: number;
+  span_count: number;
+  error_count: number;
+}
+
+export interface TraceCriticalPath {
+  span_ids: string[];
+  duration_ms: number;
+}
+
+export interface TraceDetailSummary {
+  trace_id: string;
+  start_time: string;
+  timestamp: string;
+  duration_ms: number;
+  root_service: string;
+  root_operation: string;
+  status: string;
+  span_count: number;
+  error_count: number;
+  services: string[];
+  related_logs_count: number;
+  deployment?: TraceDeploymentHint;
+}
 
 export interface TraceDetailResponse {
   data: CanonicalSpan[];
+  summary?: TraceDetailSummary;
+}
+
+export interface TraceLogsResponse {
+  data: CanonicalLog[];
+}
+
+export interface SimilarTrace {
+  trace_id: string;
+  start_time: string;
+  timestamp: string;
+  duration_ms: number;
+  status: string;
+  error_count: number;
+}
+
+export interface SimilarTracesResponse {
+  data: SimilarTrace[];
 }
 
 export interface MetricDataPoint {

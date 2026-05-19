@@ -135,6 +135,8 @@ sequenceDiagram
 | GET    | `/v1/logs/groups`                      | Query     | ClickHouse `rootpilot.logs`              |
 | GET    | `/v1/traces`                           | Query     | ClickHouse `rootpilot.spans`             |
 | GET    | `/v1/traces/:traceId`                  | Query     | ClickHouse `rootpilot.spans`             |
+| GET    | `/v1/traces/:traceId/logs`             | Query     | ClickHouse `rootpilot.logs`              |
+| GET    | `/v1/traces/:traceId/similar`          | Query     | ClickHouse `rootpilot.spans`             |
 | GET    | `/v1/metrics`                          | Query     | ClickHouse `rootpilot.metrics`           |
 | GET    | `/v1/metrics/names`                    | Query     | ClickHouse `rootpilot.metrics`           |
 | GET    | `/v1/metrics/catalog`                  | Query     | ClickHouse `rootpilot.metrics`           |

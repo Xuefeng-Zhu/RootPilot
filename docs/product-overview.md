@@ -42,13 +42,17 @@ The `/logs` page supports:
 
 The `/traces` page supports:
 
-- time range filter
-- service filter
-- minimum duration filter
-- paginated trace list
-- trace detail links to related logs for each span when trace IDs are present
+- time range, service, environment, operation, status, duration, trace ID, root
+  service, HTTP route, and error-only filters
+- latency distribution buckets for the current query
+- paginated trace list with root service, root operation, duration, span count,
+  error count, services involved, status, and deployment proximity hints
+- deep links into trace detail that preserve the selected query window
 
-The `/traces/[traceId]` page renders span detail as a waterfall.
+The `/traces/[traceId]` page shows summary cards, a CSS waterfall, expandable
+span tree, span detail panel, deterministic critical path, service breakdown,
+error spans, related trace logs with span filtering, similar traces, and
+deployment correlation hints.
 
 ### Explore metrics
 

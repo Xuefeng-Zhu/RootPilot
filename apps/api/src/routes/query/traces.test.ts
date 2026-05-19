@@ -57,8 +57,11 @@ function makeSampleTraceSummary(overrides: Partial<Record<string, unknown>> = {}
     trace_timestamp: timestamp,
     root_service: (overrides.root_service as string) ?? 'api-gateway',
     root_operation: (overrides.root_operation as string) ?? 'GET /users',
+    root_environment: (overrides.root_environment as string) ?? 'production',
     duration_ms: (overrides.duration_ms as number) ?? 150.5,
     span_count: (overrides.span_count as number) ?? 5,
+    error_count: (overrides.error_count as number) ?? 0,
+    services: (overrides.services as string[]) ?? ['api-gateway', 'user-service'],
     status: (overrides.status as string) ?? 'OK',
   };
 }
@@ -83,6 +86,26 @@ function makeSampleSpanRow(overrides: Partial<Record<string, unknown>> = {}) {
     status_code: (overrides.status_code as string) ?? 'OK',
     status_message: (overrides.status_message as string) ?? '',
     kind: (overrides.kind as string) ?? 'SERVER',
+  };
+}
+
+function makeSampleLogRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: (overrides.id as string) ?? 'log-1',
+    tenant_id: (overrides.tenant_id as string) ?? 'tenant-1',
+    project_id: (overrides.project_id as string) ?? 'project-1',
+    timestamp: (overrides.timestamp as string) ?? '2024-01-15T10:30:00.000',
+    received_at: (overrides.received_at as string) ?? '2024-01-15T10:30:01.000',
+    service_name: (overrides.service_name as string) ?? 'api-gateway',
+    environment: (overrides.environment as string) ?? 'production',
+    source: (overrides.source as string) ?? '',
+    resource_attributes: (overrides.resource_attributes as string) ?? '{}',
+    attributes: (overrides.attributes as string) ?? '{}',
+    severity: (overrides.severity as string) ?? 'ERROR',
+    message: (overrides.message as string) ?? 'Cache failed',
+    trace_id: (overrides.trace_id as string) ?? 'trace-abc-123',
+    span_id: (overrides.span_id as string) ?? 'span-001',
+    fingerprint: (overrides.fingerprint as string) ?? 'cache-failed',
   };
 }
 
@@ -232,6 +255,42 @@ describe('GET /v1/traces', () => {
       expect(body.error.code).toBe('INVALID_PARAMETER');
       expect(body.error.message).toContain('cursor');
     });
+
+    it('returns 400 for unsupported status filters', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/traces?status=TRACE',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.message).toContain('status');
+      expect(mockClickhouseQuery).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when maxDuration is lower than minDuration', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/traces?minDuration=500&maxDuration=100',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.message).toContain('maxDuration');
+      expect(mockClickhouseQuery).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for malformed trace_id filters', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/traces?trace_id=bad%20trace',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.message).toContain('trace_id');
+      expect(mockClickhouseQuery).not.toHaveBeenCalled();
+    });
   });
 
   describe('Successful queries', () => {
@@ -360,6 +419,37 @@ describe('GET /v1/traces', () => {
       expect(queryParams.minDuration).toBe(100);
     });
 
+    it('applies extended trace filters with parameterized query values', async () => {
+      mockClickhouseQuery.mockResolvedValue([]);
+      const route = encodeURIComponent('/api/checkout');
+
+      await app.inject({
+        method: 'GET',
+        url: `/v1/traces?operation=checkout&status=ERROR&maxDuration=500&trace_id=trace_123&root_service=checkout-service&http_route=${route}&error_only=true`,
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+      expect(queryText).toContain(
+        'positionCaseInsensitive(operation_name, {operation:String}) > 0',
+      );
+      expect(queryText).toContain('trace_id = {traceId:String}');
+      expect(queryText).toContain("JSONExtractString(attributes, 'http.route')");
+      expect(queryText).toContain('duration_ms <= {maxDuration:Float64}');
+      expect(queryText).toContain('status = {status:String}');
+      expect(queryText).toContain('error_count > 0');
+      expect(queryText).toContain('root_service = {rootService:String}');
+      expect(queryParams).toMatchObject({
+        tenantId: 'tenant-1',
+        operation: 'checkout',
+        status: 'ERROR',
+        maxDuration: 500,
+        traceId: 'trace_123',
+        rootService: 'checkout-service',
+        httpRoute: '/api/checkout',
+      });
+    });
+
     it('applies time range filter with from and to parameters', async () => {
       mockClickhouseQuery.mockResolvedValue([]);
 
@@ -450,6 +540,60 @@ describe('GET /v1/traces', () => {
       const body = response.json();
       expect(body.data[0].root_service).toBe('');
       expect(body.data[0].root_operation).toBe('');
+    });
+
+    it('returns latency buckets, error counts, services, and deployment hints', async () => {
+      mockClickhouseQuery
+        .mockResolvedValueOnce([
+          makeSampleTraceSummary({
+            trace_id: 'trace-fast',
+            duration_ms: 50,
+            error_count: 1,
+            status: 'ERROR',
+          }),
+          makeSampleTraceSummary({ trace_id: 'trace-mid', duration_ms: 150 }),
+          makeSampleTraceSummary({ trace_id: 'trace-slow', duration_ms: 500 }),
+          makeSampleTraceSummary({ trace_id: 'trace-second', duration_ms: 1500 }),
+          makeSampleTraceSummary({ trace_id: 'trace-very-slow', duration_ms: 4000 }),
+        ])
+        .mockResolvedValueOnce([
+          {
+            deployment_id: 'deploy-1',
+            timestamp: '2024-01-15T10:25:00.000',
+            service_name: 'api-gateway',
+            environment: 'production',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { bucket: '<100ms', count: 1 },
+          { bucket: '100-300ms', count: 1 },
+          { bucket: '300-1000ms', count: 1 },
+          { bucket: '1-3s', count: 1 },
+          { bucket: '>3s', count: 1 },
+        ]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/traces',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.data[0]).toMatchObject({
+        trace_id: 'trace-fast',
+        error_count: 1,
+        services: ['api-gateway', 'user-service'],
+        near_deployment: true,
+        deployment_id: 'deploy-1',
+      });
+      expect(body.summary.latency_buckets).toEqual([
+        { bucket: '<100ms', count: 1 },
+        { bucket: '100-300ms', count: 1 },
+        { bucket: '300-1000ms', count: 1 },
+        { bucket: '1-3s', count: 1 },
+        { bucket: '>3s', count: 1 },
+      ]);
     });
   });
 
@@ -673,6 +817,57 @@ describe('GET /v1/traces/:traceId', () => {
       });
     });
 
+    it('returns trace detail summary with related logs and deployment hint', async () => {
+      mockClickhouseQuery
+        .mockResolvedValueOnce([
+          makeSampleSpanRow({
+            span_id: 'span-root',
+            parent_span_id: '',
+            timestamp: '2024-01-15T10:30:00.000',
+            duration_ms: 200,
+          }),
+          makeSampleSpanRow({
+            span_id: 'span-child',
+            parent_span_id: 'span-root',
+            service_name: 'checkout-service',
+            operation_name: 'POST /checkout',
+            timestamp: '2024-01-15T10:30:00.050',
+            duration_ms: 75,
+            status_code: 'ERROR',
+          }),
+        ])
+        .mockResolvedValueOnce([{ count: 2 }])
+        .mockResolvedValueOnce([
+          {
+            deployment_id: 'deploy-1',
+            timestamp: '2024-01-15T10:25:00.000',
+            service_name: 'api-gateway',
+            environment: 'production',
+          },
+        ]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/traces/trace-abc-123',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.summary).toMatchObject({
+        trace_id: 'trace-abc-123',
+        root_service: 'api-gateway',
+        root_operation: 'GET /users',
+        duration_ms: 200,
+        status: 'ERROR',
+        span_count: 2,
+        error_count: 1,
+        related_logs_count: 2,
+        deployment: { near_deployment: true, deployment_id: 'deploy-1' },
+      });
+      expect(body.summary.services).toEqual(['api-gateway', 'checkout-service']);
+    });
+
     it('parses resource_attributes and attributes from JSON strings', async () => {
       mockClickhouseQuery.mockResolvedValue([
         makeSampleSpanRow({
@@ -772,5 +967,120 @@ describe('GET /v1/traces/:traceId', () => {
       const body = response.json();
       expect(body.data[0].duration_ms).toBe(300.25);
     });
+  });
+});
+
+describe('Trace drilldown endpoints', () => {
+  let app: FastifyInstance;
+  let mockClickhouseQuery: ReturnType<typeof vi.fn>;
+
+  beforeAll(async () => {
+    app = await buildApp({ logger: false });
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClickhouseQuery = vi.fn().mockResolvedValue([]);
+    mockGetClickHouseClient.mockReturnValue({
+      batchInsert: vi.fn().mockResolvedValue(undefined),
+      query: mockClickhouseQuery,
+      healthCheck: vi.fn(),
+      close: vi.fn(),
+    } as any);
+    mockValidAuth();
+  });
+
+  it('returns related logs for a trace with optional span filter', async () => {
+    mockClickhouseQuery.mockResolvedValueOnce([
+      makeSampleLogRow({ span_id: 'span-child', message: 'span-specific log' }),
+    ]);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/traces/trace-abc-123/logs?span_id=span-child',
+      headers: { 'x-api-key': 'valid-key' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.data[0]).toMatchObject({
+      trace_id: 'trace-abc-123',
+      span_id: 'span-child',
+      message: 'span-specific log',
+    });
+    const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+    expect(queryText).toContain('tenant_id = {tenantId:String}');
+    expect(queryText).toContain('trace_id = {traceId:String}');
+    expect(queryText).toContain('span_id = {spanId:String}');
+    expect(queryParams).toMatchObject({
+      tenantId: 'tenant-1',
+      traceId: 'trace-abc-123',
+      spanId: 'span-child',
+    });
+  });
+
+  it('returns similar traces for the same root service, operation, and environment', async () => {
+    mockClickhouseQuery
+      .mockResolvedValueOnce([
+        makeSampleSpanRow({
+          span_id: 'span-root',
+          parent_span_id: '',
+          service_name: 'api-gateway',
+          environment: 'production',
+          operation_name: 'GET /users',
+        }),
+      ])
+      .mockResolvedValueOnce([
+        makeSampleTraceSummary({
+          trace_id: 'trace-similar',
+          root_service: 'api-gateway',
+          root_operation: 'GET /users',
+          root_environment: 'production',
+          duration_ms: 180,
+        }),
+      ]);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/traces/trace-abc-123/similar?from=2024-01-15T00:00:00Z&to=2024-01-16T00:00:00Z&limit=5',
+      headers: { 'x-api-key': 'valid-key' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data[0]).toMatchObject({
+      trace_id: 'trace-similar',
+      duration_ms: 180,
+      status: 'OK',
+      error_count: 0,
+    });
+    const [queryText, queryParams] = mockClickhouseQuery.mock.calls[1];
+    expect(queryText).toContain('root_service = {rootService:String}');
+    expect(queryText).toContain('root_operation = {rootOperation:String}');
+    expect(queryText).toContain('trace_id != {traceId:String}');
+    expect(queryParams).toMatchObject({
+      tenantId: 'tenant-1',
+      rootService: 'api-gateway',
+      rootOperation: 'GET /users',
+      environment: 'production',
+      traceId: 'trace-abc-123',
+      limit: 5,
+    });
+  });
+
+  it('validates similar trace timestamps and limits before querying ClickHouse', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/traces/trace-abc-123/similar?from=bad&limit=99',
+      headers: { 'x-api-key': 'valid-key' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('INVALID_PARAMETER');
+    expect(mockClickhouseQuery).not.toHaveBeenCalled();
   });
 });
