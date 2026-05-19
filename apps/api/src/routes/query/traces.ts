@@ -313,6 +313,12 @@ function buildTraceConditions(
     `timestamp >= ${parseUtcDateTime64('fromTime')}`,
     `timestamp <= ${parseUtcDateTime64('toTime')}`,
   ];
+  const matchingTraceConditions = [
+    'tenant_id = {tenantId:String}',
+    `timestamp >= ${parseUtcDateTime64('fromTime')}`,
+    `timestamp <= ${parseUtcDateTime64('toTime')}`,
+  ];
+  let hasMatchingSpanFilter = false;
   const havingConditions: string[] = [];
   const queryParams: Record<string, unknown> = {
     tenantId,
@@ -321,7 +327,8 @@ function buildTraceConditions(
   };
 
   if (filters.service) {
-    conditions.push('service_name = {service:String}');
+    matchingTraceConditions.push('service_name = {service:String}');
+    hasMatchingSpanFilter = true;
     queryParams.service = filters.service;
   }
   if (filters.environment) {
@@ -329,7 +336,8 @@ function buildTraceConditions(
     queryParams.environment = filters.environment;
   }
   if (filters.operation) {
-    conditions.push('positionCaseInsensitive(operation_name, {operation:String}) > 0');
+    matchingTraceConditions.push('positionCaseInsensitive(operation_name, {operation:String}) > 0');
+    hasMatchingSpanFilter = true;
     queryParams.operation = filters.operation;
   }
   if (filters.traceId) {
@@ -337,10 +345,16 @@ function buildTraceConditions(
     queryParams.traceId = filters.traceId;
   }
   if (filters.httpRoute) {
-    conditions.push(
+    matchingTraceConditions.push(
       "coalesce(nullIf(JSONExtractString(attributes, 'http.route'), ''), JSONExtractString(attributes, 'route')) = {httpRoute:String}",
     );
+    hasMatchingSpanFilter = true;
     queryParams.httpRoute = filters.httpRoute;
+  }
+  if (hasMatchingSpanFilter) {
+    conditions.push(
+      `trace_id IN (SELECT DISTINCT trace_id FROM spans WHERE ${matchingTraceConditions.join(' AND ')})`,
+    );
   }
   if (filters.minDuration !== undefined) {
     havingConditions.push('duration_ms >= {minDuration:Float64}');
@@ -381,9 +395,9 @@ function traceSummaryQuery(whereClause: string, havingClause = '', suffix = ''):
     SELECT
       trace_id,
       min(timestamp) AS trace_timestamp,
-      if(maxIf(service_name, parent_span_id = '') != '', maxIf(service_name, parent_span_id = ''), argMin(service_name, timestamp)) AS root_service,
-      if(maxIf(operation_name, parent_span_id = '') != '', maxIf(operation_name, parent_span_id = ''), argMin(operation_name, timestamp)) AS root_operation,
-      if(maxIf(environment, parent_span_id = '') != '', maxIf(environment, parent_span_id = ''), argMin(environment, timestamp)) AS root_environment,
+      argMinIf(service_name, timestamp, parent_span_id = '') AS root_service,
+      argMinIf(operation_name, timestamp, parent_span_id = '') AS root_operation,
+      argMinIf(environment, timestamp, parent_span_id = '') AS root_environment,
       greatest(max(toUnixTimestamp64Milli(timestamp) + toInt64(greatest(duration_ms, 0))) - min(toUnixTimestamp64Milli(timestamp)), 0) AS duration_ms,
       count() AS span_count,
       countIf(status_code = 'ERROR') AS error_count,
@@ -666,7 +680,18 @@ async function findNearestDeployment(
       toTime: new Date(start + DEPLOYMENT_WINDOW_MS).toISOString(),
     },
   );
-  const match = rows.find((row) => row.deployment_id);
+  let match: DeploymentHintRow | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const row of rows) {
+    if (!row.deployment_id || !row.timestamp) continue;
+    const deploymentTime = new Date(normalizeTimestamp(row.timestamp)).getTime();
+    if (!Number.isFinite(deploymentTime)) continue;
+    const distance = Math.abs(deploymentTime - start);
+    if (distance <= DEPLOYMENT_WINDOW_MS && distance < nearestDistance) {
+      match = row;
+      nearestDistance = distance;
+    }
+  }
   return {
     near_deployment: Boolean(match?.deployment_id),
     deployment_id: match?.deployment_id ?? null,

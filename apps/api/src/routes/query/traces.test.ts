@@ -390,6 +390,29 @@ describe('GET /v1/traces', () => {
       expect(queryParams.service).toBe('api-gateway');
     });
 
+    it('matches child span filters without using child spans as root fallbacks', async () => {
+      mockClickhouseQuery.mockResolvedValue([]);
+
+      await app.inject({
+        method: 'GET',
+        url: '/v1/traces?service=checkout-service&operation=checkout',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+      expect(queryText).toContain('trace_id IN (SELECT DISTINCT trace_id FROM spans WHERE');
+      expect(queryText).toContain('service_name = {service:String}');
+      expect(queryText).toContain(
+        'positionCaseInsensitive(operation_name, {operation:String}) > 0',
+      );
+      expect(queryText).toContain("argMinIf(service_name, timestamp, parent_span_id = '')");
+      expect(queryText).not.toContain('argMin(service_name, timestamp)');
+      expect(queryParams).toMatchObject({
+        service: 'checkout-service',
+        operation: 'checkout',
+      });
+    });
+
     it('applies environment filter', async () => {
       mockClickhouseQuery.mockResolvedValue([]);
 
@@ -866,6 +889,44 @@ describe('GET /v1/traces/:traceId', () => {
         deployment: { near_deployment: true, deployment_id: 'deploy-1' },
       });
       expect(body.summary.services).toEqual(['api-gateway', 'checkout-service']);
+    });
+
+    it('selects the nearest deployment hint on trace detail', async () => {
+      mockClickhouseQuery
+        .mockResolvedValueOnce([
+          makeSampleSpanRow({
+            span_id: 'span-root',
+            parent_span_id: '',
+            timestamp: '2024-01-15T10:30:00.000',
+          }),
+        ])
+        .mockResolvedValueOnce([{ count: 0 }])
+        .mockResolvedValueOnce([
+          {
+            deployment_id: 'deploy-later',
+            timestamp: '2024-01-15T10:40:00.000',
+            service_name: 'api-gateway',
+            environment: 'production',
+          },
+          {
+            deployment_id: 'deploy-nearest',
+            timestamp: '2024-01-15T10:31:00.000',
+            service_name: 'api-gateway',
+            environment: 'production',
+          },
+        ]);
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/traces/trace-abc-123',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().summary.deployment).toEqual({
+        near_deployment: true,
+        deployment_id: 'deploy-nearest',
+      });
     });
 
     it('parses resource_attributes and attributes from JSON strings', async () => {
