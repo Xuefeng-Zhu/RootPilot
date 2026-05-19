@@ -37,6 +37,30 @@ interface SpanNode extends Span {
   children: SpanNode[];
 }
 
+function getTraceLogWindow(spans: Span[]): { from: string; to: string } | null {
+  const starts = spans
+    .map((span) => new Date(span.timestamp).getTime())
+    .filter((timestamp) => Number.isFinite(timestamp));
+  if (starts.length === 0) return null;
+
+  const ends = spans
+    .map((span) => {
+      const start = new Date(span.timestamp).getTime();
+      if (!Number.isFinite(start)) return null;
+      return start + Math.max(span.duration_ms, 0);
+    })
+    .filter((timestamp): timestamp is number => timestamp !== null && Number.isFinite(timestamp));
+
+  const paddingMs = 60 * 1000;
+  const from = Math.min(...starts) - paddingMs;
+  const to = Math.max(...(ends.length > 0 ? ends : starts)) + paddingMs;
+
+  return {
+    from: new Date(from).toISOString(),
+    to: new Date(to).toISOString(),
+  };
+}
+
 export default function TraceDetailPage() {
   const params = useParams();
   const traceId = params.traceId as string;
@@ -57,10 +81,12 @@ export default function TraceDetailPage() {
         const response = await apiClient<TraceDetailResponse>(`/v1/traces/${traceId}`);
         setSpans(response.data);
         try {
+          const traceWindow = getTraceLogWindow(response.data);
           const logsResponse = await apiClient<LogQueryResponse>('/v1/logs', {
             params: {
               trace_id: traceId,
               limit: 200,
+              ...traceWindow,
             },
           });
           setRelatedLogs(

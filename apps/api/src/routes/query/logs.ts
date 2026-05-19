@@ -56,9 +56,16 @@ interface LogGroupsQueryParams {
   from?: string;
   to?: string;
   service?: string;
+  service_name?: string;
   environment?: string;
   severity?: string;
   search?: string;
+  trace_id?: string;
+  span_id?: string;
+  error_type?: string;
+  fingerprint?: string;
+  version?: string;
+  attribute_filters?: string;
   limit?: string;
 }
 
@@ -503,29 +510,16 @@ export async function logQueryRoute(app: FastifyInstance): Promise<void> {
           .send({ error: { code: 'INVALID_PARAMETER', message: limit.message } });
       }
 
-      const severity = parseSeverity(request.query.severity);
-      if (severity instanceof Error) {
+      const filters = parseLogFilters({
+        ...request.query,
+        service_name: request.query.service_name ?? request.query.service,
+      });
+      if (filters instanceof Error) {
         return reply
           .status(400)
-          .send({ error: { code: 'INVALID_PARAMETER', message: severity.message } });
+          .send({ error: { code: 'INVALID_PARAMETER', message: filters.message } });
       }
 
-      const timeRange = parseTimeRange(request.query);
-      if (timeRange instanceof Error) {
-        return reply
-          .status(400)
-          .send({ error: { code: 'INVALID_PARAMETER', message: timeRange.message } });
-      }
-
-      const filters: ParsedLogFilters = {
-        fromTime: timeRange.fromTime,
-        toTime: timeRange.toTime,
-        serviceName: request.query.service,
-        environment: request.query.environment,
-        severity,
-        search: request.query.search,
-        attributeFilters: [],
-      };
       const { whereClause, queryParams } = buildLogWhereClause(
         request.tenantContext.tenantId,
         filters,

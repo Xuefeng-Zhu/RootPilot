@@ -294,10 +294,12 @@ curl -s "http://localhost:4000/v1/logs/around?timestamp=2024-01-15T10:00:00Z&ser
   -H "X-API-Key: rootpilot_demo_key"
 ```
 
-Group logs by fingerprint:
+Group logs by fingerprint. The grouping endpoint accepts the same filters as
+`/v1/logs`; `service` is also accepted as a backward-compatible alias for
+`service_name`:
 
 ```bash
-curl -s "http://localhost:4000/v1/logs/groups?service=checkout-service&severity=ERROR&search=timeout" \
+curl -s "http://localhost:4000/v1/logs/groups?service_name=checkout-service&severity=ERROR&trace_id=trace_123&search=timeout" \
   -H "X-API-Key: rootpilot_demo_key"
 ```
 

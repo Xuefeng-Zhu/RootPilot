@@ -649,5 +649,58 @@ describe('GET /v1/logs', () => {
         example_trace_id: 'trace-1',
       });
     });
+
+    it('applies extended filters to grouped logs', async () => {
+      mockClickhouseQuery.mockResolvedValueOnce([
+        {
+          fingerprint: 'fp-1',
+          normalized_message: 'payment timeout after <number>ms',
+          example_message: 'payment timeout after 1200ms',
+          count: '1',
+          first_seen_at: '2024-01-15T09:55:00.000',
+          last_seen_at: '2024-01-15T10:05:00.000',
+          service_name: 'checkout-service',
+          severity: 'ERROR',
+          example_trace_id: 'trace-1',
+        },
+      ]);
+
+      const attributeFilters = encodeURIComponent(
+        JSON.stringify([{ key: 'http.route', value: '/api/checkout' }]),
+      );
+      const response = await app.inject({
+        method: 'GET',
+        url: `/v1/logs/groups?service_name=checkout-service&trace_id=trace-1&span_id=span-1&error_type=TimeoutError&fingerprint=fp-1&version=v1.2.3&attribute_filters=${attributeFilters}`,
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const [queryText, queryParams] = mockClickhouseQuery.mock.calls[0];
+      expect(queryText).toContain('trace_id = {traceId:String}');
+      expect(queryText).toContain('span_id = {spanId:String}');
+      expect(queryText).toContain('fingerprint, concat');
+      expect(queryText).toContain("JSONExtractString(attributes, 'error.type')");
+      expect(queryText).toContain('JSONExtractString(attributes, {attributeKey0:String})');
+      expect(queryParams.serviceName).toBe('checkout-service');
+      expect(queryParams.traceId).toBe('trace-1');
+      expect(queryParams.spanId).toBe('span-1');
+      expect(queryParams.errorType).toBe('TimeoutError');
+      expect(queryParams.fingerprint).toBe('fp-1');
+      expect(queryParams.version).toBe('v1.2.3');
+      expect(queryParams.attributeKey0).toBe('http.route');
+      expect(queryParams.attributeValue0).toBe('/api/checkout');
+    });
+
+    it('validates malformed attribute filters for grouped logs before querying', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/logs/groups?attribute_filters=not-json',
+        headers: { 'x-api-key': 'valid-key' },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.message).toContain('attribute_filters');
+      expect(mockClickhouseQuery).not.toHaveBeenCalled();
+    });
   });
 });

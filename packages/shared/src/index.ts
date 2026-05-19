@@ -14,6 +14,7 @@ export type { PaginationParams, PaginatedResponse, DecodedCursor } from './pagin
 export type {
   ErrorResponse,
   LogQueryFilters,
+  LogGroupQueryFilters,
   LogAttributeFilter,
   TraceQueryFilters,
   MetricQueryFilters,

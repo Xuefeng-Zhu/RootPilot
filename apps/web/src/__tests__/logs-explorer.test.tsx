@@ -409,11 +409,39 @@ describe('LogsExplorerPage', () => {
 
     render(<LogsExplorerPage />);
 
+    fireEvent.change(screen.getByPlaceholderText('trace_id'), { target: { value: 'trace-abc' } });
+    fireEvent.change(screen.getByPlaceholderText('span_id'), { target: { value: 'span-abc' } });
+    fireEvent.change(screen.getByPlaceholderText('error type'), {
+      target: { value: 'TimeoutError' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('fingerprint'), { target: { value: 'fp-1' } });
+    fireEvent.change(screen.getByPlaceholderText('version'), { target: { value: 'v1.2.3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'error' }));
+    fireEvent.click(screen.getByText('Add attribute filter'));
+    fireEvent.change(screen.getByPlaceholderText('attribute key'), {
+      target: { value: 'http.route' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('attribute value'), {
+      target: { value: '/api/checkout' },
+    });
     fireEvent.click(screen.getByText('Groups'));
 
     await waitFor(() => {
       expect(screen.getByText('timeout after 1000ms')).toBeInTheDocument();
-      expect(mockApiClient).toHaveBeenCalledWith('/v1/logs/groups', expect.anything());
+      expect(mockApiClient).toHaveBeenCalledWith(
+        '/v1/logs/groups',
+        expect.objectContaining({
+          params: expect.objectContaining({
+            trace_id: 'trace-abc',
+            span_id: 'span-abc',
+            error_type: 'TimeoutError',
+            fingerprint: 'fp-1',
+            version: 'v1.2.3',
+            severity: 'ERROR',
+            attribute_filters: JSON.stringify([{ key: 'http.route', value: '/api/checkout' }]),
+          }),
+        }),
+      );
     });
   });
 });

@@ -322,16 +322,8 @@ function LogsExplorerContent() {
     setError(null);
 
     try {
-      const { from, to } = getTimeRange();
-      const params: Record<string, string | number | boolean | undefined> = {
-        from,
-        to,
-        limit: 100,
-      };
-      if (service) params.service = service;
-      if (environment) params.environment = environment;
-      if (severity) params.severity = severity;
-      if (search) params.search = search;
+      const params = buildLogParams(null);
+      params.limit = 100;
 
       const response = await apiClient<LogGroupsResponse>('/v1/logs/groups', { params });
       setGroups(response.data);
@@ -344,7 +336,7 @@ function LogsExplorerContent() {
     } finally {
       setLoading(false);
     }
-  }, [environment, getTimeRange, search, service, severity]);
+  }, [buildLogParams]);
 
   const fetchLiveLogs = useCallback(async () => {
     if (viewMode !== 'logs') return;

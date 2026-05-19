@@ -170,6 +170,17 @@ describe('TraceDetailPage', () => {
       expect(screen.getByText('1 related log')).toBeInTheDocument();
     });
 
+    expect(mockApiClient).toHaveBeenCalledWith(
+      '/v1/logs',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          trace_id: 'trace-abc',
+          from: '2024-01-01T11:59:00.000Z',
+          to: '2024-01-01T12:01:00.150Z',
+        }),
+      }),
+    );
+
     const relatedLogLink = screen.getByText('1 log').closest('a');
     expect(relatedLogLink).toHaveAttribute('href', '/logs?trace_id=trace-abc&span_id=span-child2');
   });

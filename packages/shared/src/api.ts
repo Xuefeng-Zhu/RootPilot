@@ -34,6 +34,10 @@ export interface LogQueryFilters {
   cursor?: string;
 }
 
+export interface LogGroupQueryFilters extends Omit<LogQueryFilters, 'cursor'> {
+  service?: string; // Backward-compatible alias for service_name
+}
+
 export interface LogAttributeFilter {
   key: string;
   value: string;
