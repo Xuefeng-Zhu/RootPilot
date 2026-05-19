@@ -142,6 +142,38 @@ describe('TraceDetailPage', () => {
     expect(paddings).toContain('16px');
   });
 
+  it('renders related logs for spans with links back to the logs explorer', async () => {
+    mockApiClient.mockImplementation(async (path: string) => {
+      if (path === '/v1/traces/trace-abc') {
+        return { data: mockSpans };
+      }
+      if (path === '/v1/logs') {
+        return {
+          data: [
+            {
+              id: 'log-1',
+              span_id: 'span-child2',
+              message: 'Cache failed',
+              severity: 'ERROR',
+              timestamp: '2024-01-01T12:00:00.080Z',
+            },
+          ],
+          pagination: { cursor: null, hasMore: false },
+        };
+      }
+      return { data: [] };
+    });
+
+    render(<TraceDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('1 related log')).toBeInTheDocument();
+    });
+
+    const relatedLogLink = screen.getByText('1 log').closest('a');
+    expect(relatedLogLink).toHaveAttribute('href', '/logs?trace_id=trace-abc&span_id=span-child2');
+  });
+
   it('renders 404 state when trace is not found', async () => {
     const { ApiError } = await import('../lib/api');
     mockApiClient.mockRejectedValue(new ApiError(404, 'Not found'));

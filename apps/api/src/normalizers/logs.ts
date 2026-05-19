@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { CanonicalLog, LogSeverity } from '@rootpilot/shared';
+import { createErrorFingerprint, stringAttribute } from '../correlation/fingerprint.js';
 
 /**
  * OTLP attribute key-value pair format.
@@ -148,6 +149,17 @@ export function normalizeLogRecords(
         const severity = mapSeverityNumber(logRecord.severityNumber);
         const message = logRecord.body?.stringValue || '';
         const attributes = flattenAttributes(logRecord.attributes);
+        const route = stringAttribute(attributes, ['http.route', 'route']);
+        const errorType =
+          stringAttribute(attributes, ['error.type', 'exception.type']) ?? inferErrorType(message);
+        const fingerprint = createErrorFingerprint({
+          tenantId,
+          projectId,
+          serviceName,
+          route,
+          errorType,
+          message,
+        });
 
         const canonicalLog: CanonicalLog = {
           id: uuidv4(),
@@ -164,7 +176,7 @@ export function normalizeLogRecords(
           message,
           trace_id: logRecord.traceId || '',
           span_id: logRecord.spanId || '',
-          fingerprint: '',
+          fingerprint: fingerprint.fingerprint,
         };
 
         results.push(canonicalLog);
@@ -173,4 +185,9 @@ export function normalizeLogRecords(
   }
 
   return results;
+}
+
+function inferErrorType(message: string): string | undefined {
+  const match = /([A-Z][A-Za-z0-9_.]*(?:Error|Exception|Timeout))/u.exec(message);
+  return match?.[1];
 }

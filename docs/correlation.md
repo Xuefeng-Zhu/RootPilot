@@ -10,6 +10,11 @@ Errors are grouped from:
 - `ERROR` and `FATAL` logs.
 - Spans with `status_code = ERROR`.
 
+Newly ingested logs also populate the ClickHouse `logs.fingerprint` column so
+the logs explorer can group and filter by fingerprint directly. Older rows with
+an empty fingerprint are still grouped by a legacy message-based fallback in
+`GET /v1/logs/groups`.
+
 The fingerprint strategy:
 
 - Lowercases stable text.

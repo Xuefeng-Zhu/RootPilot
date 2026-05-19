@@ -28,12 +28,15 @@ The `/` page shows:
 
 The `/logs` page supports:
 
-- time presets and custom time range
-- service and environment filters
-- severity filters
-- message search
-- load-more pagination
-- log detail drawer
+- time presets, custom time range, message search, and load-more pagination
+- service, environment, severity, trace ID, span ID, error type, fingerprint,
+  version, and attribute key/value filters
+- a facet sidebar for top services, severities, environments, error types,
+  HTTP routes, fingerprints, and versions
+- a query summary bar with active filter chips and local saved queries
+- structured log detail drawer with trace links, copy actions, nearby logs, and
+  same-fingerprint drilldowns
+- fingerprint group view and polling-based live tail mode
 
 ### Explore traces
 
@@ -43,6 +46,7 @@ The `/traces` page supports:
 - service filter
 - minimum duration filter
 - paginated trace list
+- trace detail links to related logs for each span when trace IDs are present
 
 The `/traces/[traceId]` page renders span detail as a waterfall.
 

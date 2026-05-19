@@ -158,7 +158,7 @@ describe('normalizeLogRecords', () => {
       'service.name': 'auth-service',
       'deployment.environment': 'production',
     });
-    expect(log.fingerprint).toBe('');
+    expect(log.fingerprint).toMatch(/^[0-9a-f]{64}$/);
     expect(log.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(log.timestamp).toBe('2024-06-15T10:00:00.000Z');
     expect(log.received_at).toBe('2024-06-15T10:00:00.000Z');

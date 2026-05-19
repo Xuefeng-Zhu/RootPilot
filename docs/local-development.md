@@ -280,6 +280,27 @@ curl -s "http://localhost:4000/v1/logs?from=2024-01-01T00:00:00Z&to=2024-12-31T2
   -H "X-API-Key: rootpilot_demo_key"
 ```
 
+With trace, message, and attribute filters:
+
+```bash
+curl -s "http://localhost:4000/v1/logs?trace_id=trace_123&search=timeout&attribute_filters=%5B%7B%22key%22%3A%22http.route%22%2C%22value%22%3A%22%2Fapi%2Fcheckout%22%7D%5D" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
+
+Fetch logs around a known event:
+
+```bash
+curl -s "http://localhost:4000/v1/logs/around?timestamp=2024-01-15T10:00:00Z&service=checkout-service&environment=production&before_seconds=300&after_seconds=300" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
+
+Group logs by fingerprint:
+
+```bash
+curl -s "http://localhost:4000/v1/logs/groups?service=checkout-service&severity=ERROR&search=timeout" \
+  -H "X-API-Key: rootpilot_demo_key"
+```
+
 #### Query Traces
 
 List trace summaries:
