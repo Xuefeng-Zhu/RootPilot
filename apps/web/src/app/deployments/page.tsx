@@ -5,6 +5,14 @@ import { useEffect, useState } from 'react';
 import type { DeploymentImpactResponse } from '@rootpilot/shared';
 import { apiClient } from '../../lib/api';
 import { formatMs, formatNumber, formatTimestamp } from '../../lib/format';
+import {
+  EmptyState,
+  ErrorState,
+  PageTitle,
+  Panel,
+  StatCard,
+  StatusBadge,
+} from '../../components/ui';
 
 interface DeploymentEvent {
   deployment_id: string;
@@ -72,11 +80,23 @@ export default function DeploymentsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Deployments</h1>
-        <p className="text-sm text-gray-400 mt-1">
-          Deployment events with deterministic before and after impact analysis.
-        </p>
+      <PageTitle
+        title="Deployments"
+        description="Deployment events with deterministic before and after impact analysis."
+      />
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <StatCard label="Deployments" value={deployments.length} tone="info" />
+        <StatCard
+          label="High Impact"
+          value={deployments.filter((item) => item.impact?.summary.risk_level === 'high').length}
+          tone="bad"
+        />
+        <StatCard
+          label="Services Changed"
+          value={new Set(deployments.map((item) => item.service_name)).size}
+          tone="purple"
+        />
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -85,13 +105,13 @@ export default function DeploymentsPage() {
           onChange={(event) => setService(event.target.value)}
           placeholder="Filter service..."
           aria-label="Filter deployments by service"
-          className="w-64 px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
+          className="rp-input w-64"
         />
         <select
           value={environment}
           onChange={(event) => setEnvironment(event.target.value)}
           aria-label="Filter deployments by environment"
-          className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
+          className="rp-input"
         >
           <option value="">All Environments</option>
           {environments.map((name) => (
@@ -102,93 +122,68 @@ export default function DeploymentsPage() {
         </select>
       </div>
 
-      {loading && <div className="text-gray-400">Loading deployments...</div>}
-
-      {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
-          {error}
-        </div>
+      {loading && (
+        <Panel>
+          <div className="p-8 text-center text-sm text-slate-400">Loading deployments...</div>
+        </Panel>
       )}
 
+      {error && <ErrorState message={error} />}
+
       {!loading && !error && deployments.length === 0 && (
-        <div className="bg-surface-card border border-surface-border rounded-lg p-8 text-center">
-          <p className="text-gray-400">No deployment events found.</p>
-          <p className="text-gray-500 text-sm mt-2">
-            Run `npm run simulate:bad-deploy` and `npm run correlations:refresh`.
-          </p>
-        </div>
+        <EmptyState
+          title="No deployment events found"
+          description="Run npm run simulate:bad-deploy and npm run correlations:refresh."
+        />
       )}
 
       {!loading && !error && deployments.length > 0 && (
-        <div className="overflow-x-auto border border-surface-border rounded-lg">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-400 uppercase border-b border-surface-border bg-surface-card/60">
-              <tr>
-                <th className="px-4 py-3">Service</th>
-                <th className="px-4 py-3">Version</th>
-                <th className="px-4 py-3">Environment</th>
-                <th className="px-4 py-3">Impact</th>
-                <th className="px-4 py-3">Errors After</th>
-                <th className="px-4 py-3">p95 After</th>
-                <th className="px-4 py-3">Git SHA</th>
-                <th className="px-4 py-3">Deployed By</th>
-                <th className="px-4 py-3">Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deployments.map((deployment) => (
-                <tr
-                  key={deployment.deployment_id}
-                  className="border-b border-surface-border last:border-b-0 hover:bg-surface-card/50"
-                >
-                  <td className="px-4 py-3 font-medium text-white">
-                    <Link
-                      href={`/deployments/${encodeURIComponent(deployment.deployment_id)}`}
-                      className="hover:text-sidebar-active"
-                    >
-                      {deployment.service_name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-300">{deployment.version}</td>
-                  <td className="px-4 py-3 text-gray-400">{deployment.environment}</td>
-                  <td className="px-4 py-3">
-                    <ImpactBadge risk={deployment.impact?.summary.risk_level ?? 'unknown'} />
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">
-                    {formatNumber(deployment.impact?.summary.error_count_after)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">
-                    {formatMs(deployment.impact?.summary.p95_latency_after_ms)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">
-                    <code className="text-xs">{deployment.git_sha || '-'}</code>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">{deployment.deployed_by || 'unknown'}</td>
-                  <td className="px-4 py-3 text-gray-400">
-                    {formatTimestamp(deployment.timestamp)}
-                  </td>
+        <Panel className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="rp-table">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3">Service</th>
+                  <th className="px-4 py-3">Version</th>
+                  <th className="px-4 py-3">Environment</th>
+                  <th className="px-4 py-3">Impact</th>
+                  <th className="px-4 py-3">Errors After</th>
+                  <th className="px-4 py-3">p95 After</th>
+                  <th className="px-4 py-3">Git SHA</th>
+                  <th className="px-4 py-3">Deployed By</th>
+                  <th className="px-4 py-3">Time</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {deployments.map((deployment) => (
+                  <tr key={deployment.deployment_id}>
+                    <td className="font-medium text-white">
+                      <Link
+                        href={`/deployments/${encodeURIComponent(deployment.deployment_id)}`}
+                        className="hover:text-cyan-300"
+                      >
+                        {deployment.service_name}
+                      </Link>
+                    </td>
+                    <td>{deployment.version}</td>
+                    <td>{deployment.environment}</td>
+                    <td>
+                      <StatusBadge status={deployment.impact?.summary.risk_level ?? 'unknown'} />
+                    </td>
+                    <td>{formatNumber(deployment.impact?.summary.error_count_after)}</td>
+                    <td>{formatMs(deployment.impact?.summary.p95_latency_after_ms)}</td>
+                    <td>
+                      <code className="text-xs">{deployment.git_sha || '-'}</code>
+                    </td>
+                    <td>{deployment.deployed_by || 'unknown'}</td>
+                    <td>{formatTimestamp(deployment.timestamp)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
       )}
     </div>
-  );
-}
-
-function ImpactBadge({ risk }: { risk: string }) {
-  const colors =
-    risk === 'high'
-      ? 'bg-red-900/40 text-red-300 border-red-700'
-      : risk === 'medium'
-        ? 'bg-amber-900/30 text-amber-300 border-amber-700'
-        : risk === 'low'
-          ? 'bg-emerald-900/30 text-emerald-300 border-emerald-700'
-          : 'bg-gray-800 text-gray-400 border-gray-700';
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs border ${colors}`}>
-      {risk.charAt(0).toUpperCase() + risk.slice(1)}
-    </span>
   );
 }

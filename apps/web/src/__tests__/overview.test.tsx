@@ -2,6 +2,27 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import OverviewPage from '../app/page';
 
+vi.mock('recharts', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const React = require('react');
+  const passthrough =
+    (name: string) =>
+    ({ children }: { children?: React.ReactNode; [key: string]: unknown }) =>
+      React.createElement('div', { 'data-recharts': name }, children);
+  const chart = (name: string) => () => React.createElement('div', { 'data-recharts': name });
+  return {
+    ResponsiveContainer: passthrough('ResponsiveContainer'),
+    AreaChart: chart('AreaChart'),
+    Area: passthrough('Area'),
+    LineChart: chart('LineChart'),
+    Line: passthrough('Line'),
+    CartesianGrid: passthrough('CartesianGrid'),
+    Tooltip: passthrough('Tooltip'),
+    XAxis: passthrough('XAxis'),
+    YAxis: passthrough('YAxis'),
+  };
+});
+
 // Mock the API client
 vi.mock('../lib/api', () => ({
   apiClient: vi.fn(),
@@ -90,17 +111,15 @@ describe('OverviewPage', () => {
 
     // Summary cards should show correct totals
     await waitFor(() => {
-      expect(screen.getByText('2')).toBeInTheDocument(); // 2 services
-      expect(screen.getByText('200')).toBeInTheDocument(); // 120 + 80 logs
-      expect(screen.getByText('75')).toBeInTheDocument(); // 50 + 25 traces
-      expect(screen.getByText('40')).toBeInTheDocument(); // 30 + 10 metrics
+      expect(screen.getByText('Services')).toBeInTheDocument();
+      expect(screen.getByText('Log Volume')).toBeInTheDocument();
+      expect(screen.getByText('Trace Volume')).toBeInTheDocument();
+      expect(screen.getAllByText('Error Rate').length).toBeGreaterThan(0);
     });
 
-    // Labels present
-    expect(screen.getByText('Services')).toBeInTheDocument();
-    expect(screen.getByText('Logs')).toBeInTheDocument();
-    expect(screen.getByText('Traces')).toBeInTheDocument();
-    expect(screen.getByText('Metrics')).toBeInTheDocument();
+    expect(screen.getAllByText('2').length).toBeGreaterThan(0);
+    expect(screen.getByText('200')).toBeInTheDocument(); // 120 + 80 logs
+    expect(screen.getByText('75')).toBeInTheDocument(); // 50 + 25 traces
   });
 
   it('renders recent deployment events', async () => {
@@ -142,15 +161,15 @@ describe('OverviewPage', () => {
     render(<OverviewPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Recent Deployments')).toBeInTheDocument();
+      expect(screen.getAllByText('Recent Deployments').length).toBeGreaterThan(0);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('auth-service')).toBeInTheDocument();
-      expect(screen.getByText('2.0.0')).toBeInTheDocument();
-      expect(screen.getByText('deploy-bot')).toBeInTheDocument();
-      expect(screen.getByText('api-gateway')).toBeInTheDocument();
-      expect(screen.getByText('1.5.0')).toBeInTheDocument();
+      expect(screen.getAllByText('auth-service').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('2.0.0').length).toBeGreaterThan(0);
+      expect(screen.getByText(/deploy-bot/)).toBeInTheDocument();
+      expect(screen.getAllByText('api-gateway').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('1.5.0').length).toBeGreaterThan(0);
     });
   });
 

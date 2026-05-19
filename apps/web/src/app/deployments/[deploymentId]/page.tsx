@@ -6,6 +6,14 @@ import { useEffect, useState } from 'react';
 import type { DeploymentImpactResponse, ErrorGroup, TimelineEvent } from '@rootpilot/shared';
 import { apiClient } from '../../../lib/api';
 import { formatMs, formatNumber, formatTimestamp } from '../../../lib/format';
+import {
+  EmptyState,
+  ErrorState,
+  PageTitle,
+  Panel,
+  StatCard,
+  StatusBadge,
+} from '../../../components/ui';
 
 interface ListResponse<T> {
   data: T[];
@@ -82,8 +90,10 @@ export default function DeploymentImpactPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-white">Deployment Impact</h1>
-        <div className="text-gray-400">Loading deployment impact...</div>
+        <PageTitle title="Deployment Impact" description="Loading deployment analysis..." />
+        <Panel>
+          <div className="p-8 text-center text-sm text-slate-400">Loading deployment impact...</div>
+        </Panel>
       </div>
     );
   }
@@ -91,10 +101,8 @@ export default function DeploymentImpactPage() {
   if (error || !state) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-white">Deployment Impact</h1>
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
-          {error ?? 'Deployment not found'}
-        </div>
+        <PageTitle title="Deployment Impact" />
+        <ErrorState message={error ?? 'Deployment not found'} />
       </div>
     );
   }
@@ -103,52 +111,56 @@ export default function DeploymentImpactPage() {
   const deployment = impact.deployment;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Deployment Impact</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            {deployment.service_name} {deployment.version} · {deployment.environment} ·{' '}
-            {formatTimestamp(deployment.timestamp)}
-          </p>
-        </div>
-        <Link
-          href={`/services/${encodeURIComponent(deployment.service_name)}?environment=${encodeURIComponent(
-            deployment.environment,
+    <div className="space-y-5">
+      <PageTitle
+        title="Deployment Impact"
+        description={`${deployment.service_name} ${deployment.version} · ${deployment.environment} · ${formatTimestamp(deployment.timestamp)}`}
+        actions={
+          <Link
+            href={`/services/${encodeURIComponent(deployment.service_name)}?environment=${encodeURIComponent(
+              deployment.environment,
+            )}`}
+            className="rp-button rp-button-primary"
+          >
+            Open Service
+          </Link>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Risk"
+          value={<StatusBadge status={impact.summary.risk_level} />}
+          tone={
+            impact.summary.risk_level === 'high'
+              ? 'bad'
+              : impact.summary.risk_level === 'medium'
+                ? 'warn'
+                : 'good'
+          }
+        />
+        <StatCard
+          label="Errors Before / After"
+          value={`${formatNumber(impact.summary.error_count_before)} -> ${formatNumber(
+            impact.summary.error_count_after,
           )}`}
-          className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 hover:text-white"
-        >
-          Open Service
-        </Link>
+          tone="bad"
+        />
+        <StatCard
+          label="p95 Before / After"
+          value={`${formatMs(impact.summary.p95_latency_before_ms)} -> ${formatMs(
+            impact.summary.p95_latency_after_ms,
+          )}`}
+          tone="warn"
+        />
+        <StatCard
+          label="New Error Groups"
+          value={formatNumber(impact.summary.new_error_groups)}
+          tone="purple"
+        />
       </div>
 
-      <section className="bg-surface-card border border-surface-border rounded-lg p-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <ImpactStat
-            label="Risk"
-            value={impact.summary.risk_level.toUpperCase()}
-            tone={impact.summary.risk_level}
-          />
-          <ImpactStat
-            label="Errors Before / After"
-            value={`${formatNumber(impact.summary.error_count_before)} -> ${formatNumber(
-              impact.summary.error_count_after,
-            )}`}
-          />
-          <ImpactStat
-            label="p95 Before / After"
-            value={`${formatMs(impact.summary.p95_latency_before_ms)} -> ${formatMs(
-              impact.summary.p95_latency_after_ms,
-            )}`}
-          />
-          <ImpactStat
-            label="New Error Groups"
-            value={formatNumber(impact.summary.new_error_groups)}
-          />
-        </div>
-      </section>
-
-      <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+      <Panel className="p-5">
         <h2 className="text-lg font-semibold text-white mb-4">Correlation Signals</h2>
         <div className="space-y-3">
           {impact.signals.map((signal) => (
@@ -158,20 +170,20 @@ export default function DeploymentImpactPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Panel>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+        <Panel className="p-5">
           <h2 className="text-lg font-semibold text-white mb-4">New Error Groups</h2>
           {state.errorGroups.length === 0 ? (
-            <p className="text-sm text-gray-400">No new error groups in the analyzed window.</p>
+            <EmptyState title="No new error groups in the analyzed window" />
           ) : (
             <div className="space-y-3">
               {state.errorGroups.map((group) => (
                 <Link
                   key={group.id}
-                  href={`/error-groups?service=${encodeURIComponent(group.service_name)}`}
-                  className="block border border-surface-border rounded p-3 hover:border-sidebar-active"
+                  href={`/error-groups/${encodeURIComponent(group.id)}`}
+                  className="block rounded border border-surface-border bg-surface-subtle p-3 hover:border-red-400/50"
                 >
                   <p className="text-sm font-medium text-red-300">
                     {group.error_type ?? group.normalized_message}
@@ -181,30 +193,30 @@ export default function DeploymentImpactPage() {
               ))}
             </div>
           )}
-        </section>
+        </Panel>
 
-        <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+        <Panel className="p-5">
           <h2 className="text-lg font-semibold text-white mb-4">Example Traces</h2>
           {impact.example_trace_ids.length === 0 ? (
-            <p className="text-sm text-gray-400">No example traces were attached to this impact.</p>
+            <EmptyState title="No example traces were attached to this impact" />
           ) : (
             <div className="space-y-2">
               {impact.example_trace_ids.map((traceId) => (
                 <Link
                   key={traceId}
                   href={`/traces/${encodeURIComponent(traceId)}`}
-                  className="block border border-surface-border rounded p-3 text-sm text-sidebar-active hover:text-white hover:border-sidebar-active"
+                  className="block rounded border border-surface-border bg-surface-subtle p-3 text-sm text-cyan-300 hover:border-purple-400/50 hover:text-white"
                 >
                   {traceId}
                 </Link>
               ))}
             </div>
           )}
-        </section>
+        </Panel>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+        <Panel className="p-5">
           <h2 className="text-lg font-semibold text-white mb-4">Service Timeline</h2>
           <div className="space-y-3">
             {state.timeline.slice(0, 8).map((event) => (
@@ -217,13 +229,16 @@ export default function DeploymentImpactPage() {
               </div>
             ))}
           </div>
-        </section>
+        </Panel>
 
-        <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+        <Panel className="p-5">
           <h2 className="text-lg font-semibold text-white mb-4">Related Logs</h2>
           <div className="space-y-2">
             {state.logs.map((log) => (
-              <div key={log.id} className="border border-surface-border rounded p-3">
+              <div
+                key={log.id}
+                className="rounded border border-surface-border bg-surface-subtle p-3"
+              >
                 <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                   <span className={log.severity === 'ERROR' ? 'text-red-300' : 'text-gray-300'}>
                     {log.severity}
@@ -234,25 +249,8 @@ export default function DeploymentImpactPage() {
               </div>
             ))}
           </div>
-        </section>
+        </Panel>
       </div>
-    </div>
-  );
-}
-
-function ImpactStat({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  const toneClass =
-    tone === 'high'
-      ? 'text-red-300'
-      : tone === 'medium'
-        ? 'text-amber-300'
-        : tone === 'low'
-          ? 'text-emerald-300'
-          : 'text-white';
-  return (
-    <div>
-      <p className="text-sm text-gray-400">{label}</p>
-      <p className={`text-xl font-semibold mt-1 ${toneClass}`}>{value}</p>
     </div>
   );
 }

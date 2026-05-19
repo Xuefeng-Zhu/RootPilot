@@ -27,6 +27,25 @@ npm run correlations:refresh -- --from now-2h --to now
 
 Open `http://localhost:3000`.
 
+## Demo Flow
+
+```bash
+npm run seed
+npm run simulate:bad-deploy -- --duration 10m --rate 30
+npm run correlations:refresh -- --from now-2h --to now
+```
+
+Then open:
+
+1. `http://localhost:3000/`
+2. `http://localhost:3000/service-map`
+3. `http://localhost:3000/services/checkout-service?environment=production`
+4. `http://localhost:3000/logs?severity=ERROR&service_name=checkout-service`
+5. `http://localhost:3000/traces`
+6. `http://localhost:3000/metrics`
+7. `http://localhost:3000/deployments`
+8. `http://localhost:3000/error-groups`
+
 ## Useful Commands
 
 ```bash
@@ -50,6 +69,7 @@ npm run correlations:refresh -- --from now-2h --to now
 - Service graph and correlation ADR: `docs/adr/0002-service-graph-correlation-layer.md`
 - Service graph: `docs/service-graph.md`
 - Correlation: `docs/correlation.md`
+- UI design: `docs/ui-design.md`
 - Testing: `docs/testing.md`
 - Security: `docs/security.md`
 - Release notes: `docs/release.md`
