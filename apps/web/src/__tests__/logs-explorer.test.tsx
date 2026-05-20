@@ -73,11 +73,21 @@ const mockLogs = [
   },
 ];
 
+async function selectRadixOption(label: string, optionName: string) {
+  const trigger = screen.getByLabelText(label);
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+  fireEvent.click(await screen.findByRole('option', { name: optionName }));
+}
+
 describe('LogsExplorerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
     intersectionCallback = null;
+    window.HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
+    window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal('IntersectionObserver', mockIntersectionObserver);
   });
 
@@ -99,10 +109,10 @@ describe('LogsExplorerPage', () => {
     });
 
     // Default compact filter controls are visible
-    expect(screen.getByLabelText('Select log time range')).toHaveDisplayValue('Last 1h');
-    expect(screen.getByLabelText('Select log service')).toHaveDisplayValue('All Services');
-    expect(screen.getByLabelText('Select log environment')).toHaveDisplayValue('All Environments');
-    expect(screen.getByLabelText('Select log severity')).toHaveDisplayValue('All Severities');
+    expect(screen.getByLabelText('Select log time range')).toHaveTextContent('Last 1h');
+    expect(screen.getByLabelText('Select log service')).toHaveTextContent('All Services');
+    expect(screen.getByLabelText('Select log environment')).toHaveTextContent('All Environments');
+    expect(screen.getByLabelText('Select log severity')).toHaveTextContent('All Severities');
     expect(screen.getByPlaceholderText('Search logs...')).toBeInTheDocument();
 
     // Logs rendered in table
@@ -134,9 +144,7 @@ describe('LogsExplorerPage', () => {
       ([path]) => path === '/v1/logs',
     ).length;
 
-    fireEvent.change(screen.getByLabelText('Select log time range'), {
-      target: { value: '24h' },
-    });
+    await selectRadixOption('Select log time range', 'Last 24h');
 
     // New API call should be made with updated time range
     await waitFor(() => {
@@ -168,8 +176,7 @@ describe('LogsExplorerPage', () => {
     });
 
     // Select a service from dropdown
-    const serviceSelect = screen.getByDisplayValue('All Services');
-    fireEvent.change(serviceSelect, { target: { value: 'auth-service' } });
+    await selectRadixOption('Select log service', 'auth-service');
 
     // Verify API was called with service_name param
     await waitFor(() => {
