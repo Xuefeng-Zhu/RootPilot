@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@radix-ui/react-select": "^2.2.6",
     "@rootpilot/shared": "*",
     "next": "^14.2.0",
     "react": "^18.3.0",

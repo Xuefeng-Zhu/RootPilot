@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import type {
   CanonicalLog,
   LogAroundResponse,
@@ -14,6 +14,7 @@ import type {
   LogQueryResponse,
   LogSummary,
 } from '@rootpilot/shared';
+import { SelectControl } from '../../components/select-control';
 import { apiClient, ApiError } from '../../lib/api';
 
 type LogEntry = CanonicalLog;
@@ -159,6 +160,7 @@ function LogsExplorerContent() {
   const [live, setLive] = useState(false);
   const [savedQueries, setSavedQueries] = useState<SavedLogQuery[]>(DEFAULT_SAVED_QUERIES);
   const [saveName, setSaveName] = useState('');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const logScrollRef = useRef<HTMLDivElement | null>(null);
@@ -480,7 +482,22 @@ function LogsExplorerContent() {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-    searchTimeoutRef.current = setTimeout(() => setSearch(value), 350);
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearch(value);
+      searchTimeoutRef.current = null;
+    }, 350);
+  }
+
+  function cancelPendingSearchDebounce() {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+  }
+
+  function handleTimeRangeChange(value: string) {
+    setTimeRange(value);
+    if (value === 'custom') setAdvancedOpen(true);
   }
 
   function addAttributeFilter(filter: AttributeFilter = { key: '', value: '' }) {
@@ -513,7 +530,25 @@ function LogsExplorerContent() {
     if (facet === 'versions') setVersion(value);
   }
 
+  function clearFilters() {
+    cancelPendingSearchDebounce();
+    setService('');
+    setEnvironment('');
+    setSeverity('');
+    setTraceId('');
+    setSpanId('');
+    setErrorType('');
+    setFingerprint('');
+    setVersion('');
+    setSearch('');
+    setSearchInput('');
+    setAttributeFilters([]);
+    setNearbyLabel(null);
+    setViewMode('logs');
+  }
+
   function applySavedQuery(query: SavedLogQuery) {
+    cancelPendingSearchDebounce();
     setTimeRange(query.filters.timeRange);
     setCustomFrom(query.filters.customFrom);
     setCustomTo(query.filters.customTo);
@@ -583,243 +618,293 @@ function LogsExplorerContent() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Logs Explorer</h1>
-          {live && <p className="mt-1 text-xs font-medium text-green-300">Live tail active</p>}
-          {nearbyLabel && <p className="mt-1 text-xs text-blue-300">{nearbyLabel}</p>}
+    <div className="flex h-full min-h-[calc(100vh-6.5rem)] flex-col overflow-hidden">
+      <div className="shrink-0 pb-4">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-white">Logs Explorer</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+              {live && <span className="font-medium text-emerald-300">Live tail active</span>}
+              {nearbyLabel && <span className="text-cyan-300">{nearbyLabel}</span>}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen((open) => !open)}
+              className={`rp-button h-9 px-3 text-xs ${
+                advancedOpen ? 'border-cyan-400/50 bg-cyan-400/10 text-cyan-100' : ''
+              }`}
+              aria-expanded={advancedOpen}
+            >
+              Advanced filters
+            </button>
+            <label className="rp-button h-9 cursor-pointer gap-2 px-3 text-xs">
+              <input
+                type="checkbox"
+                checked={live}
+                onChange={(event) => setLive(event.target.checked)}
+                className="h-3.5 w-3.5 accent-cyan-400"
+              />
+              Live
+            </label>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setViewMode('logs')}
-            className={`px-3 py-1.5 text-xs font-medium rounded ${
-              viewMode === 'logs'
-                ? 'bg-sidebar-active text-white'
-                : 'bg-surface-card text-gray-400 hover:text-white'
-            }`}
-          >
-            Logs
-          </button>
-          <button
-            onClick={() => setViewMode('groups')}
-            className={`px-3 py-1.5 text-xs font-medium rounded ${
-              viewMode === 'groups'
-                ? 'bg-sidebar-active text-white'
-                : 'bg-surface-card text-gray-400 hover:text-white'
-            }`}
-          >
-            Groups
-          </button>
-          <label className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 bg-surface-card border border-surface-border rounded">
+
+        <div className="flex flex-wrap items-center gap-3">
+          <SelectControl
+            value={timeRange}
+            onChange={handleTimeRangeChange}
+            aria-label="Select log time range"
+            triggerClassName="min-w-44"
+            options={[
+              ...TIME_RANGE_OPTIONS.map((option) => ({
+                label: `Last ${option.label}`,
+                value: option.value,
+              })),
+              { label: 'Custom range', value: 'custom' },
+            ]}
+          />
+
+          <SelectControl
+            value={service}
+            onChange={setService}
+            aria-label="Select log service"
+            triggerClassName="min-w-40"
+            options={[
+              { label: 'All Services', value: '' },
+              ...[...new Set(services.map((entry) => entry.service_name))].map((serviceName) => ({
+                label: serviceName,
+                value: serviceName,
+              })),
+            ]}
+          />
+
+          <SelectControl
+            value={environment}
+            onChange={setEnvironment}
+            aria-label="Select log environment"
+            triggerClassName="min-w-32"
+            options={[
+              { label: 'All Environments', value: '' },
+              ...environments.map((env) => ({
+                label: env,
+                value: env,
+              })),
+            ]}
+          />
+
+          <SelectControl
+            value={severity}
+            onChange={setSeverity}
+            aria-label="Select log severity"
+            triggerClassName="min-w-36"
+            options={[
+              { label: 'All Severities', value: '' },
+              ...SEVERITY_OPTIONS.map((option) => ({
+                label: option,
+                value: option,
+              })),
+            ]}
+          />
+
+          <div className="relative min-w-64 flex-1">
             <input
-              type="checkbox"
-              checked={live}
-              onChange={(event) => setLive(event.target.checked)}
-              className="accent-sidebar-active"
+              type="text"
+              placeholder="Search logs..."
+              value={searchInput}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              className="rp-input h-10 w-full pl-9"
+              aria-label="Search logs"
             />
-            Live
-          </label>
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          </div>
         </div>
-      </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <FacetsSidebar facets={facets} onSelect={applyFacet} />
-
-        <div className="flex min-h-0 flex-col">
-          <div className="mb-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {TIME_RANGE_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setTimeRange(option.value)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded ${
-                    timeRange === option.value
-                      ? 'bg-sidebar-active text-white'
-                      : 'bg-surface-card text-gray-400 hover:text-white hover:bg-surface-border'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-              <button
-                onClick={() => setTimeRange('custom')}
-                className={`px-3 py-1.5 text-xs font-medium rounded ${
-                  timeRange === 'custom'
-                    ? 'bg-sidebar-active text-white'
-                    : 'bg-surface-card text-gray-400 hover:text-white hover:bg-surface-border'
-                }`}
-              >
-                Custom
-              </button>
-              {timeRange === 'custom' && (
-                <>
-                  <input
-                    type="datetime-local"
-                    value={customFrom}
-                    onChange={(event) => setCustomFrom(event.target.value)}
-                    className="px-2 py-1.5 text-xs bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
-                  />
-                  <span className="text-xs text-gray-500">to</span>
-                  <input
-                    type="datetime-local"
-                    value={customTo}
-                    onChange={(event) => setCustomTo(event.target.value)}
-                    className="px-2 py-1.5 text-xs bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
-                  />
-                </>
-              )}
+        {advancedOpen && (
+          <div className="mt-3 rounded-lg border border-surface-border bg-surface-card/70 p-3 shadow-panel">
+            <div className="grid gap-3 lg:grid-cols-5">
+              <AdvancedField label="Trace ID">
+                <input
+                  value={traceId}
+                  onChange={(event) => setTraceId(event.target.value)}
+                  placeholder="trace_id"
+                  className="rp-input h-9 w-full text-xs"
+                />
+              </AdvancedField>
+              <AdvancedField label="Span ID">
+                <input
+                  value={spanId}
+                  onChange={(event) => setSpanId(event.target.value)}
+                  placeholder="span_id"
+                  className="rp-input h-9 w-full text-xs"
+                />
+              </AdvancedField>
+              <AdvancedField label="Error type">
+                <input
+                  value={errorType}
+                  onChange={(event) => setErrorType(event.target.value)}
+                  placeholder="error type"
+                  className="rp-input h-9 w-full text-xs"
+                />
+              </AdvancedField>
+              <AdvancedField label="Fingerprint">
+                <input
+                  value={fingerprint}
+                  onChange={(event) => setFingerprint(event.target.value)}
+                  placeholder="fingerprint"
+                  className="rp-input h-9 w-full text-xs"
+                />
+              </AdvancedField>
+              <AdvancedField label="Version">
+                <input
+                  value={version}
+                  onChange={(event) => setVersion(event.target.value)}
+                  placeholder="version"
+                  className="rp-input h-9 w-full text-xs"
+                />
+              </AdvancedField>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-              <select
-                value={service}
-                onChange={(event) => setService(event.target.value)}
-                className="px-3 py-2 text-xs bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
-              >
-                <option value="">All Services</option>
-                {[...new Set(services.map((entry) => entry.service_name))].map((serviceName) => (
-                  <option key={serviceName} value={serviceName}>
-                    {serviceName}
-                  </option>
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              {timeRange === 'custom' && (
+                <>
+                  <AdvancedField label="From">
+                    <input
+                      type="datetime-local"
+                      value={customFrom}
+                      onChange={(event) => setCustomFrom(event.target.value)}
+                      className="rp-input h-9 text-xs"
+                    />
+                  </AdvancedField>
+                  <AdvancedField label="To">
+                    <input
+                      type="datetime-local"
+                      value={customTo}
+                      onChange={(event) => setCustomTo(event.target.value)}
+                      className="rp-input h-9 text-xs"
+                    />
+                  </AdvancedField>
+                </>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                {SEVERITY_OPTIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setSeverity((current) => (current === option ? '' : option))}
+                    className={`rounded px-2.5 py-1 text-xs font-medium ${
+                      severity === option
+                        ? SEVERITY_COLORS[option]
+                        : 'bg-surface-subtle text-slate-500 hover:text-slate-200'
+                    }`}
+                  >
+                    {option.toLowerCase()}
+                  </button>
                 ))}
-              </select>
-              <select
-                value={environment}
-                onChange={(event) => setEnvironment(event.target.value)}
-                className="px-3 py-2 text-xs bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
-              >
-                <option value="">All Environments</option>
-                {environments.map((env) => (
-                  <option key={env} value={env}>
-                    {env}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={traceId}
-                onChange={(event) => setTraceId(event.target.value)}
-                placeholder="trace_id"
-                className="px-3 py-2 text-xs bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
-              />
-              <input
-                value={spanId}
-                onChange={(event) => setSpanId(event.target.value)}
-                placeholder="span_id"
-                className="px-3 py-2 text-xs bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
-              />
-              <input
-                value={errorType}
-                onChange={(event) => setErrorType(event.target.value)}
-                placeholder="error type"
-                className="px-3 py-2 text-xs bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
-              />
-              <input
-                value={fingerprint}
-                onChange={(event) => setFingerprint(event.target.value)}
-                placeholder="fingerprint"
-                className="px-3 py-2 text-xs bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
-              />
-              <input
-                value={version}
-                onChange={(event) => setVersion(event.target.value)}
-                placeholder="version"
-                className="px-3 py-2 text-xs bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
-              />
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search messages..."
-                  value={searchInput}
-                  onChange={(event) => handleSearchChange(event.target.value)}
-                  className="w-full pl-8 pr-3 py-2 text-xs bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
-                />
-                <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+              </div>
+
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('logs')}
+                  className={`rp-button h-8 px-3 text-xs ${
+                    viewMode === 'logs' ? 'border-cyan-400/50 bg-cyan-400/10 text-cyan-100' : ''
+                  }`}
+                >
+                  Logs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('groups')}
+                  className={`rp-button h-8 px-3 text-xs ${
+                    viewMode === 'groups' ? 'border-cyan-400/50 bg-cyan-400/10 text-cyan-100' : ''
+                  }`}
+                >
+                  Groups
+                </button>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-gray-500">Severity</span>
-              {SEVERITY_OPTIONS.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setSeverity((current) => (current === option ? '' : option))}
-                  className={`px-2.5 py-1 text-xs font-medium rounded ${
-                    severity === option
-                      ? SEVERITY_COLORS[option]
-                      : 'bg-surface-card text-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  {option.toLowerCase()}
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-2">
+            <div className="mt-3 space-y-2">
               {attributeFilters.map((filter, index) => (
                 <div key={`${index}-${filter.key}`} className="flex flex-wrap items-center gap-2">
                   <input
                     value={filter.key}
                     onChange={(event) => updateAttributeFilter(index, { key: event.target.value })}
                     placeholder="attribute key"
-                    className="px-3 py-1.5 text-xs bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
+                    className="rp-input h-8 w-48 text-xs"
                   />
-                  <span className="text-xs text-gray-500">=</span>
+                  <span className="text-xs text-slate-500">=</span>
                   <input
                     value={filter.value}
                     onChange={(event) =>
                       updateAttributeFilter(index, { value: event.target.value })
                     }
                     placeholder="attribute value"
-                    className="px-3 py-1.5 text-xs bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
+                    className="rp-input h-8 w-56 text-xs"
                   />
                   <button
+                    type="button"
                     onClick={() => removeAttributeFilter(index)}
-                    className="px-2 py-1 text-xs bg-surface-card text-gray-400 hover:text-white rounded"
+                    className="rp-button h-8 px-2 text-xs"
                   >
                     Remove
                   </button>
                 </div>
               ))}
               <button
+                type="button"
                 onClick={() => addAttributeFilter()}
-                className="px-3 py-1.5 text-xs bg-surface-card border border-surface-border rounded text-gray-300 hover:text-white"
+                className="rp-button h-8 px-3 text-xs"
               >
                 Add attribute filter
               </button>
             </div>
 
-            <SummaryBar
-              summary={summary}
-              timeRangeLabel={selectedTimeRangeLabel}
-              activeFilters={activeFilters}
-              nearbyLabel={nearbyLabel}
-              onClearNearby={() => fetchLogs(false)}
-            />
-
-            <SavedQueriesBar
-              savedQueries={savedQueries}
-              saveName={saveName}
-              onSaveNameChange={setSaveName}
-              onSave={saveCurrentQuery}
-              onApply={applySavedQuery}
-              onDelete={deleteSavedQuery}
-            />
+            <div className="mt-3 border-t border-surface-border pt-3">
+              <SavedQueriesBar
+                savedQueries={savedQueries}
+                saveName={saveName}
+                onSaveNameChange={setSaveName}
+                onSave={saveCurrentQuery}
+                onApply={applySavedQuery}
+                onDelete={deleteSavedQuery}
+              />
+            </div>
           </div>
+        )}
 
+        <SummaryBar
+          summary={summary}
+          timeRangeLabel={selectedTimeRangeLabel}
+          activeFilters={activeFilters}
+          nearbyLabel={nearbyLabel}
+          onClearNearby={() => fetchLogs(false)}
+        />
+      </div>
+
+      <div
+        className={`grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-lg border border-surface-border bg-surface/35 ${
+          selectedLog
+            ? 'xl:grid-cols-[260px_minmax(0,1fr)_360px]'
+            : 'xl:grid-cols-[260px_minmax(0,1fr)]'
+        }`}
+      >
+        <FacetsSidebar facets={facets} onSelect={applyFacet} onClear={clearFilters} />
+
+        <div className="flex min-h-0 flex-col border-l border-surface-border">
           {error && (
-            <div className="mb-4 px-4 py-3 bg-red-900/30 border border-red-800 rounded text-sm text-red-300">
+            <div className="m-3 rounded border border-red-800 bg-red-950/40 px-4 py-3 text-sm text-red-200">
               {error}
             </div>
           )}
 
-          <div
-            ref={logScrollRef}
-            className="min-h-0 flex-1 overflow-auto border border-surface-border rounded"
-          >
+          <div ref={logScrollRef} className="min-h-0 flex-1 overflow-auto">
             {loading ? (
               <div className="flex items-center justify-center py-16">
-                <div className="text-gray-400 text-sm">
+                <div className="text-sm text-slate-400">
                   {viewMode === 'groups' ? 'Loading log groups...' : 'Loading logs...'}
                 </div>
               </div>
@@ -828,14 +913,19 @@ function LogsExplorerContent() {
             ) : logs.length === 0 && !error ? (
               <div className="flex items-center justify-center py-16">
                 <div className="text-center">
-                  <p className="text-gray-400 text-sm">No results found</p>
-                  <p className="text-gray-500 text-xs mt-1">
+                  <p className="text-sm text-slate-300">No results found</p>
+                  <p className="mt-1 text-xs text-slate-500">
                     Try adjusting your filters or time range
                   </p>
                 </div>
               </div>
             ) : (
-              <LogsTable logs={logs} onSelectLog={setSelectedLog} onCopy={copyText} />
+              <LogsTable
+                logs={logs}
+                selectedLogId={selectedLog?.id}
+                onSelectLog={setSelectedLog}
+                onCopy={copyText}
+              />
             )}
 
             {viewMode === 'logs' && hasMore && (
@@ -845,25 +935,25 @@ function LogsExplorerContent() {
                 className="flex min-h-14 items-center justify-center py-4"
                 aria-live="polite"
               >
-                {loadingMore && <div className="text-sm text-gray-400">Loading more logs...</div>}
+                {loadingMore && <div className="text-sm text-slate-400">Loading more logs...</div>}
               </div>
             )}
           </div>
         </div>
-      </div>
 
-      {selectedLog && (
-        <LogDetailDrawer
-          log={selectedLog}
-          onClose={() => setSelectedLog(null)}
-          onCopy={copyText}
-          onViewNearby={handleViewNearby}
-          onSelectFingerprint={(nextFingerprint) => {
-            setFingerprint(nextFingerprint);
-            setSelectedLog(null);
-          }}
-        />
-      )}
+        {selectedLog && (
+          <LogDetailDrawer
+            log={selectedLog}
+            onClose={() => setSelectedLog(null)}
+            onCopy={copyText}
+            onViewNearby={handleViewNearby}
+            onSelectFingerprint={(nextFingerprint) => {
+              setFingerprint(nextFingerprint);
+              setSelectedLog(null);
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -871,47 +961,95 @@ function LogsExplorerContent() {
 function FacetsSidebar({
   facets,
   onSelect,
+  onClear,
 }: {
   facets: LogFacetCollection;
   onSelect: (facet: LogFacetName, value: string) => void;
+  onClear: () => void;
 }) {
+  const [serviceFacetSearch, setServiceFacetSearch] = useState('');
   const sections: Array<{ key: LogFacetName; label: string }> = [
     { key: 'services', label: 'Services' },
     { key: 'severities', label: 'Severities' },
     { key: 'environments', label: 'Environments' },
     { key: 'error_types', label: 'Error types' },
-    { key: 'http_routes', label: 'HTTP routes' },
     { key: 'fingerprints', label: 'Fingerprints' },
+    { key: 'http_routes', label: 'HTTP routes' },
     { key: 'versions', label: 'Versions' },
   ];
 
   return (
-    <aside className="min-h-0 overflow-auto border border-surface-border rounded p-3">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Facets</h2>
-      <div className="space-y-4">
-        {sections.map((section) => (
-          <div key={section.key}>
-            <p className="mb-1.5 text-xs font-medium text-gray-300">{section.label}</p>
-            <div className="space-y-1">
-              {facets[section.key].length === 0 ? (
-                <p className="text-xs text-gray-600">No values</p>
-              ) : (
-                facets[section.key].map((facet) => (
-                  <button
-                    key={`${section.key}-${facet.value}`}
-                    onClick={() => onSelect(section.key, facet.value)}
-                    className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-xs text-gray-400 hover:bg-surface-card hover:text-white"
-                  >
-                    <span className="truncate">{facet.value}</span>
-                    <span className="font-mono text-gray-500">{facet.count}</span>
-                  </button>
-                ))
+    <aside className="min-h-0 overflow-auto bg-surface-card/45 p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-200">Facets</h2>
+        <button type="button" onClick={onClear} className="text-xs text-cyan-300 hover:text-white">
+          Clear all
+        </button>
+      </div>
+      <div className="space-y-5">
+        {sections.map((section) => {
+          const values =
+            section.key === 'services' && serviceFacetSearch
+              ? facets[section.key].filter((facet) =>
+                  facet.value.toLowerCase().includes(serviceFacetSearch.toLowerCase()),
+                )
+              : facets[section.key];
+
+          return (
+            <div key={section.key}>
+              <p className="mb-2 text-xs font-semibold text-slate-300">
+                {section.key === 'services' ? 'Service' : section.label}
+              </p>
+              {section.key === 'services' && (
+                <div className="relative mb-3">
+                  <input
+                    value={serviceFacetSearch}
+                    onChange={(event) => setServiceFacetSearch(event.target.value)}
+                    placeholder="Search values"
+                    className="rp-input h-9 w-full pl-8 text-xs"
+                  />
+                  <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                </div>
               )}
+              <div className="space-y-1.5">
+                {values.length === 0 ? (
+                  <p className="px-2 py-1 text-xs text-slate-600">No values</p>
+                ) : (
+                  values.map((facet) => (
+                    <button
+                      key={`${section.key}-${facet.value}`}
+                      onClick={() => onSelect(section.key, facet.value)}
+                      className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm text-slate-400 hover:bg-surface-raised/70 hover:text-white"
+                    >
+                      <span className="flex min-w-0 items-center gap-2 truncate">
+                        {section.key === 'severities' && (
+                          <span
+                            className={`h-3.5 w-3.5 rounded ${severityDotClass(facet.value)}`}
+                          />
+                        )}
+                        <span className="truncate">{facet.value}</span>
+                      </span>
+                      <span className="shrink-0 font-mono text-xs text-slate-500">
+                        {formatFacetCount(facet.count)}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </aside>
+  );
+}
+
+function AdvancedField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="space-y-1 text-xs text-slate-500">
+      <span>{label}</span>
+      {children}
+    </label>
   );
 }
 
@@ -929,16 +1067,16 @@ function SummaryBar({
   onClearNearby: () => void;
 }) {
   return (
-    <div className="border border-surface-border rounded p-3">
-      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+    <div className="mt-3 rounded-md border border-surface-border/80 bg-surface-subtle/45 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
         <span>
-          <span className="text-white font-semibold">{summary?.total ?? 0}</span> matching logs
+          <span className="font-semibold text-white">{summary?.total ?? 0}</span> matching logs
         </span>
         <span>
-          <span className="text-red-300 font-semibold">{summary?.error_count ?? 0}</span> errors
+          <span className="font-semibold text-red-300">{summary?.error_count ?? 0}</span> errors
         </span>
         <span>
-          <span className="text-yellow-300 font-semibold">{summary?.warning_count ?? 0}</span>{' '}
+          <span className="font-semibold text-amber-300">{summary?.warning_count ?? 0}</span>{' '}
           warnings
         </span>
         <span>{timeRangeLabel}</span>
@@ -954,7 +1092,7 @@ function SummaryBar({
             <button
               key={filter.key}
               onClick={filter.onRemove}
-              className="max-w-full truncate rounded bg-surface-card px-2 py-1 text-xs text-gray-300 hover:text-white"
+              className="max-w-full truncate rounded bg-surface-raised px-2 py-1 text-xs text-slate-300 hover:text-white"
               title="Remove filter"
             >
               {filter.label} ×
@@ -987,19 +1125,19 @@ function SavedQueriesBar({
         value={saveName}
         onChange={(event) => onSaveNameChange(event.target.value)}
         placeholder="Saved query name"
-        className="px-3 py-1.5 text-xs bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
+        className="rp-input h-8 min-w-44 text-xs"
       />
       <button
         onClick={onSave}
         disabled={!saveName.trim()}
-        className="px-3 py-1.5 text-xs bg-surface-card border border-surface-border rounded text-gray-300 hover:text-white disabled:opacity-50"
+        className="rp-button h-8 px-3 text-xs disabled:opacity-50"
       >
         Save current
       </button>
       {savedQueries.map((query) => (
         <span
           key={query.id}
-          className="inline-flex items-center gap-1 rounded bg-surface-card px-2 py-1 text-xs"
+          className="inline-flex items-center gap-1 rounded-md border border-surface-border bg-surface-subtle px-2 py-1 text-xs"
         >
           <button onClick={() => onApply(query)} className="text-gray-300 hover:text-white">
             {query.name}
@@ -1019,68 +1157,76 @@ function SavedQueriesBar({
 
 function LogsTable({
   logs,
+  selectedLogId,
   onSelectLog,
   onCopy,
 }: {
   logs: LogEntry[];
+  selectedLogId?: string;
   onSelectLog: (log: LogEntry) => void;
   onCopy: (value: string) => void;
 }) {
   return (
-    <table className="w-full min-w-[1120px] text-sm">
-      <thead className="sticky top-0 bg-surface-card border-b border-surface-border">
+    <table className="w-full min-w-[820px] text-sm">
+      <thead className="sticky top-0 z-10 border-b border-surface-border bg-surface-raised/80 backdrop-blur">
         <tr>
           {[
             'Timestamp',
             'Severity',
             'Service',
-            'Environment',
             'Message',
-            'Trace',
+            'Trace ID',
+            'Environment',
             'Span',
             'Fingerprint',
             'Attributes',
-            'Actions',
+            '',
           ].map((heading) => (
             <th
               key={heading}
-              className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400"
+              className={`px-4 py-3 text-left text-xs font-medium text-slate-400 ${
+                ['Environment', 'Span', 'Fingerprint', 'Attributes', ''].includes(heading)
+                  ? 'hidden 2xl:table-cell'
+                  : ''
+              }`}
             >
               {heading}
             </th>
           ))}
         </tr>
       </thead>
-      <tbody className="divide-y divide-surface-border">
+      <tbody className="divide-y divide-surface-border/80">
         {logs.map((log) => (
           <tr
             key={log.id}
             onClick={() => onSelectLog(log)}
-            className="hover:bg-surface-card/50 cursor-pointer transition-colors"
+            className={`cursor-pointer transition-colors hover:bg-surface-raised/45 ${
+              selectedLogId === log.id ? 'bg-cyan-400/5' : ''
+            }`}
           >
-            <td className="px-3 py-2 text-xs text-gray-400 font-mono whitespace-nowrap">
+            <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-400">
               {formatTimestamp(log.timestamp)}
             </td>
-            <td className="px-3 py-2">
+            <td className="px-4 py-3">
               <SeverityBadge severity={log.severity} />
             </td>
-            <td className="px-3 py-2 text-xs text-gray-300 max-w-[150px] truncate">
+            <td className="max-w-[150px] truncate px-4 py-3 text-sm text-slate-300">
               {log.service_name || '—'}
             </td>
-            <td className="px-3 py-2 text-xs text-gray-300 max-w-[110px] truncate">
-              {log.environment || '—'}
-            </td>
-            <td className="px-3 py-2 text-xs text-gray-300 max-w-[300px] truncate">
+            <td className="max-w-[420px] truncate px-4 py-3 text-sm text-slate-300">
               {log.message || '—'}
             </td>
-            <td className="px-3 py-2 text-xs font-mono">
+            <td className="px-4 py-3 font-mono text-xs">
               <LinkedId
                 href={log.trace_id ? `/traces/${log.trace_id}` : ''}
                 value={log.trace_id}
                 onCopy={onCopy}
               />
             </td>
-            <td className="px-3 py-2 text-xs font-mono">
+            <td className="hidden max-w-[110px] truncate px-4 py-3 text-xs text-slate-400 2xl:table-cell">
+              {log.environment || '—'}
+            </td>
+            <td className="hidden px-4 py-3 font-mono text-xs 2xl:table-cell">
               <LinkedId
                 href={
                   log.trace_id && log.span_id
@@ -1092,21 +1238,21 @@ function LogsTable({
               />
             </td>
             <td
-              className="px-3 py-2 text-xs text-gray-400 font-mono max-w-[160px] truncate"
+              className="hidden max-w-[160px] truncate px-4 py-3 font-mono text-xs text-slate-400 2xl:table-cell"
               title={log.fingerprint}
             >
               {shortId(log.fingerprint)}
             </td>
-            <td className="px-3 py-2 text-xs text-gray-400 max-w-[220px] truncate">
+            <td className="hidden max-w-[220px] truncate px-4 py-3 text-xs text-slate-400 2xl:table-cell">
               <AttributesPreview attributes={log.attributes} />
             </td>
-            <td className="px-3 py-2">
+            <td className="hidden px-4 py-3 2xl:table-cell">
               <button
                 onClick={(event) => {
                   event.stopPropagation();
                   onCopy(JSON.stringify(log, null, 2));
                 }}
-                className="rounded bg-surface-card px-2 py-1 text-xs text-gray-300 hover:text-white"
+                className="rounded bg-surface-subtle px-2 py-1 text-xs text-slate-400 hover:text-white"
               >
                 Copy JSON
               </button>
@@ -1254,83 +1400,80 @@ function LogDetailDrawer({
   }, [onClose]);
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
-      <div className="fixed top-0 right-0 h-full w-[560px] max-w-[94vw] bg-surface-card border-l border-surface-border z-50 flex flex-col shadow-2xl animate-slide-in">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border">
-          <div>
-            <h2 className="text-sm font-semibold text-white">Log Detail</h2>
-            <p className="mt-1 text-xs text-gray-500 font-mono">{log.id}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white"
-            aria-label="Close drawer"
-          >
-            <CloseIcon className="w-5 h-5" />
-          </button>
+    <aside className="flex min-h-0 flex-col border-l border-surface-border bg-surface-card/65">
+      <div className="flex items-center justify-between border-b border-surface-border px-5 py-4">
+        <h2 className="text-xl font-semibold tracking-tight text-white">Log Detail</h2>
+        <button
+          onClick={onClose}
+          className="text-slate-400 hover:text-white"
+          aria-label="Close drawer"
+        >
+          <CloseIcon className="h-5 w-5" />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 py-5">
+        <div className="space-y-5 border-b border-surface-border pb-5">
+          <DetailValue label="Timestamp" value={formatTimestamp(log.timestamp)} mono />
+          <DetailValue label="Severity" value={log.severity} severity={log.severity} />
+          <DetailValue
+            label="Service"
+            value={log.service_name || '—'}
+            linkHref={serviceHref(log)}
+          />
+          <DetailValue
+            label="Trace ID"
+            value={log.trace_id || '—'}
+            mono
+            linkHref={traceHref(log)}
+          />
+          <DetailValue label="Span ID" value={log.span_id || '—'} mono />
+          <DetailValue
+            label="Host"
+            value={resourceValue(log, 'host.name') || resourceValue(log, 'host') || '—'}
+          />
+          <DetailValue label="Environment" value={log.environment || '—'} />
         </div>
-        <div className="flex-1 space-y-5 overflow-y-auto p-5">
-          <section>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">
-              Message
-            </p>
-            <p className="whitespace-pre-wrap break-words text-sm text-gray-100">
-              {log.message || '—'}
-            </p>
-          </section>
 
-          <section className="grid grid-cols-2 gap-3 text-xs">
-            <DetailValue label="Timestamp" value={formatTimestamp(log.timestamp)} mono />
-            <DetailValue label="Severity" value={log.severity} />
-            <DetailValue label="Service" value={log.service_name || '—'} />
-            <DetailValue label="Environment" value={log.environment || '—'} />
-            <DetailValue label="Trace ID" value={log.trace_id || '—'} mono />
-            <DetailValue label="Span ID" value={log.span_id || '—'} mono />
-            <DetailValue label="Fingerprint" value={log.fingerprint || '—'} mono />
-          </section>
+        <section className="border-b border-surface-border py-5">
+          <p className="mb-3 text-sm font-semibold text-slate-200">Message</p>
+          <pre className="whitespace-pre-wrap break-words rounded-md border border-surface-border bg-surface-subtle/70 p-3 font-mono text-sm leading-6 text-slate-200">
+            {log.message || '—'}
+          </pre>
+        </section>
 
+        <div className="space-y-5 py-5">
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => onCopy(JSON.stringify(log, null, 2))}
-              className="rounded bg-surface px-3 py-1.5 text-xs text-gray-300 hover:text-white"
+              className="rp-button h-8 px-3 text-xs"
             >
               Copy log JSON
             </button>
             {log.trace_id && (
               <>
-                <button
-                  onClick={() => onCopy(log.trace_id)}
-                  className="rounded bg-surface px-3 py-1.5 text-xs text-gray-300 hover:text-white"
-                >
+                <button onClick={() => onCopy(log.trace_id)} className="rp-button h-8 px-3 text-xs">
                   Copy trace_id
                 </button>
                 <Link
                   href={`/traces/${log.trace_id}`}
-                  className="rounded bg-surface px-3 py-1.5 text-xs text-blue-300 hover:text-blue-200"
+                  className="rp-button h-8 px-3 text-xs text-cyan-200"
                 >
                   View trace
                 </Link>
               </>
             )}
             {log.span_id && (
-              <button
-                onClick={() => onCopy(log.span_id)}
-                className="rounded bg-surface px-3 py-1.5 text-xs text-gray-300 hover:text-white"
-              >
+              <button onClick={() => onCopy(log.span_id)} className="rp-button h-8 px-3 text-xs">
                 Copy span_id
               </button>
             )}
-            <button
-              onClick={() => onViewNearby(log)}
-              className="rounded bg-surface px-3 py-1.5 text-xs text-gray-300 hover:text-white"
-            >
+            <button onClick={() => onViewNearby(log)} className="rp-button h-8 px-3 text-xs">
               View logs around this event
             </button>
             {log.fingerprint && (
               <button
                 onClick={() => onSelectFingerprint(log.fingerprint)}
-                className="rounded bg-surface px-3 py-1.5 text-xs text-gray-300 hover:text-white"
+                className="rp-button h-8 px-3 text-xs"
               >
                 Same fingerprint
               </button>
@@ -1341,7 +1484,7 @@ function LogDetailDrawer({
           <AttributesSection title="Custom attributes" attributes={log.attributes} />
         </div>
       </div>
-    </>
+    </aside>
   );
 }
 
@@ -1349,15 +1492,29 @@ function DetailValue({
   label,
   value,
   mono = false,
+  severity,
+  linkHref,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  severity?: string;
+  linkHref?: string;
 }) {
+  const content = severity ? (
+    <SeverityBadge severity={severity} />
+  ) : linkHref && value !== '—' ? (
+    <Link href={linkHref} className="break-all text-cyan-300 hover:text-white">
+      {value}
+    </Link>
+  ) : (
+    value
+  );
+
   return (
-    <div>
-      <p className="mb-1 text-gray-500">{label}</p>
-      <p className={`break-words text-gray-200 ${mono ? 'font-mono' : ''}`}>{value}</p>
+    <div className="grid grid-cols-[80px_minmax(0,1fr)] gap-4 text-sm">
+      <p className="text-slate-400">{label}</p>
+      <p className={`break-words text-slate-200 ${mono ? 'font-mono text-xs' : ''}`}>{content}</p>
     </div>
   );
 }
@@ -1389,13 +1546,46 @@ function AttributesSection({
   );
 }
 
+function serviceHref(log: LogEntry): string | undefined {
+  if (!log.service_name) return undefined;
+  const params = new URLSearchParams();
+  if (log.environment) params.set('environment', log.environment);
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return `/services/${encodeURIComponent(log.service_name)}${suffix}`;
+}
+
+function traceHref(log: LogEntry): string | undefined {
+  if (!log.trace_id) return undefined;
+  return `/traces/${encodeURIComponent(log.trace_id)}`;
+}
+
+function resourceValue(log: LogEntry, key: string): string {
+  return String(log.resource_attributes[key] ?? log.attributes[key] ?? '');
+}
+
 function SeverityBadge({ severity }: { severity: string }) {
   const colorClass = SEVERITY_COLORS[severity] ?? 'bg-gray-700 text-gray-300';
   return (
-    <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${colorClass}`}>
-      {severity.toLowerCase()}
+    <span
+      className={`inline-block rounded-md border border-current/20 px-2 py-0.5 text-xs font-semibold ${colorClass}`}
+    >
+      {severity}
     </span>
   );
+}
+
+function severityDotClass(severity: string): string {
+  if (severity === 'ERROR' || severity === 'FATAL') return 'bg-red-400';
+  if (severity === 'WARN') return 'bg-amber-400';
+  if (severity === 'INFO') return 'bg-blue-400';
+  if (severity === 'DEBUG') return 'bg-emerald-400';
+  return 'bg-slate-500';
+}
+
+function formatFacetCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(count >= 10_000_000 ? 0 : 1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(count >= 10_000 ? 0 : 1)}K`;
+  return String(count);
 }
 
 function AttributesPreview({ attributes }: { attributes: Record<string, string> }) {

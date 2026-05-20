@@ -73,11 +73,21 @@ const mockLogs = [
   },
 ];
 
+async function selectRadixOption(label: string, optionName: string) {
+  const trigger = screen.getByLabelText(label);
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+  fireEvent.click(await screen.findByRole('option', { name: optionName }));
+}
+
 describe('LogsExplorerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
     intersectionCallback = null;
+    window.HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
+    window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal('IntersectionObserver', mockIntersectionObserver);
   });
 
@@ -98,12 +108,12 @@ describe('LogsExplorerPage', () => {
       expect(screen.getByText('Logs Explorer')).toBeInTheDocument();
     });
 
-    // Default time range buttons are visible
-    expect(screen.getByText('15m')).toBeInTheDocument();
-    expect(screen.getAllByText('1h').length).toBeGreaterThan(0);
-    expect(screen.getByText('6h')).toBeInTheDocument();
-    expect(screen.getByText('24h')).toBeInTheDocument();
-    expect(screen.getByText('7d')).toBeInTheDocument();
+    // Default compact filter controls are visible
+    expect(screen.getByLabelText('Select log time range')).toHaveTextContent('Last 1h');
+    expect(screen.getByLabelText('Select log service')).toHaveTextContent('All Services');
+    expect(screen.getByLabelText('Select log environment')).toHaveTextContent('All Environments');
+    expect(screen.getByLabelText('Select log severity')).toHaveTextContent('All Severities');
+    expect(screen.getByPlaceholderText('Search logs...')).toBeInTheDocument();
 
     // Logs rendered in table
     await waitFor(() => {
@@ -134,8 +144,7 @@ describe('LogsExplorerPage', () => {
       ([path]) => path === '/v1/logs',
     ).length;
 
-    // Click 24h time range
-    fireEvent.click(screen.getByText('24h'));
+    await selectRadixOption('Select log time range', 'Last 24h');
 
     // New API call should be made with updated time range
     await waitFor(() => {
@@ -167,8 +176,7 @@ describe('LogsExplorerPage', () => {
     });
 
     // Select a service from dropdown
-    const serviceSelect = screen.getByDisplayValue('All Services');
-    fireEvent.change(serviceSelect, { target: { value: 'auth-service' } });
+    await selectRadixOption('Select log service', 'auth-service');
 
     // Verify API was called with service_name param
     await waitFor(() => {
@@ -310,6 +318,84 @@ describe('LogsExplorerPage', () => {
     });
   });
 
+  it('keeps all returned non-service facet values selectable', async () => {
+    mockApiClient.mockImplementation(async (path: string) => {
+      if (path === '/v1/services') {
+        return { data: [] };
+      }
+      if (path === '/v1/logs') {
+        return {
+          data: mockLogs,
+          pagination: { cursor: null, hasMore: false },
+          facets: {
+            services: [],
+            severities: [],
+            environments: Array.from({ length: 6 }, (_, index) => ({
+              value: `env-${index + 1}`,
+              count: index + 1,
+            })),
+            error_types: [],
+            http_routes: [],
+            fingerprints: [],
+            versions: [],
+          },
+        };
+      }
+      return { data: [] };
+    });
+
+    render(<LogsExplorerPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /env-6/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /env-6/i }));
+
+    await waitFor(() => {
+      const logCalls = mockApiClient.mock.calls.filter(([path]) => path === '/v1/logs');
+      const lastCall = logCalls[logCalls.length - 1];
+      expect(lastCall[1]).toMatchObject({
+        params: expect.objectContaining({ environment: 'env-6' }),
+      });
+    });
+  });
+
+  it('cancels a pending search debounce when clearing filters', async () => {
+    mockApiClient.mockImplementation(async (path: string) => {
+      if (path === '/v1/services') {
+        return { data: [] };
+      }
+      if (path === '/v1/logs') {
+        return { data: mockLogs, pagination: { cursor: null, hasMore: false } };
+      }
+      return { data: [] };
+    });
+
+    render(<LogsExplorerPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Connection failed')).toBeInTheDocument();
+    });
+
+    vi.useFakeTimers();
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Search logs'), {
+        target: { value: 'timeout' },
+      });
+      fireEvent.click(screen.getByText('Clear all'));
+      vi.advanceTimersByTime(400);
+    });
+    vi.useRealTimers();
+
+    expect(screen.getByLabelText('Search logs')).toHaveValue('');
+    expect(
+      mockApiClient.mock.calls
+        .filter(([path]) => path === '/v1/logs')
+        .some(([, options]) => options?.params?.search === 'timeout'),
+    ).toBe(false);
+  });
+
   it('opens a structured drawer and queries nearby logs', async () => {
     mockApiClient.mockImplementation(async (path: string) => {
       if (path === '/v1/services') {
@@ -361,6 +447,8 @@ describe('LogsExplorerPage', () => {
 
     render(<LogsExplorerPage />);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced filters' }));
+
     await waitFor(() => {
       expect(screen.getByText('Checkout errors last 30m')).toBeInTheDocument();
     });
@@ -408,6 +496,8 @@ describe('LogsExplorerPage', () => {
     });
 
     render(<LogsExplorerPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced filters' }));
 
     fireEvent.change(screen.getByPlaceholderText('trace_id'), { target: { value: 'trace-abc' } });
     fireEvent.change(screen.getByPlaceholderText('span_id'), { target: { value: 'span-abc' } });
