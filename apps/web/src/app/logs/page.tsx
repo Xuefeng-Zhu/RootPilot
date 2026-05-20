@@ -1,6 +1,5 @@
 'use client';
 
-import * as Select from '@radix-ui/react-select';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,6 +14,7 @@ import type {
   LogQueryResponse,
   LogSummary,
 } from '@rootpilot/shared';
+import { SelectControl } from '../../components/select-control';
 import { apiClient, ApiError } from '../../lib/api';
 
 type LogEntry = CanonicalLog;
@@ -67,7 +67,6 @@ const TIME_RANGE_OPTIONS = [
 const SEVERITY_OPTIONS = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL'] as const;
 const PAGE_SIZE = 50;
 const SAVED_QUERIES_KEY = 'rootpilot.logs.savedQueries.v1';
-const RADIX_EMPTY_VALUE = '__rootpilot_empty__';
 
 const EMPTY_FACETS: LogFacetCollection = {
   services: [],
@@ -483,7 +482,17 @@ function LogsExplorerContent() {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-    searchTimeoutRef.current = setTimeout(() => setSearch(value), 350);
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearch(value);
+      searchTimeoutRef.current = null;
+    }, 350);
+  }
+
+  function cancelPendingSearchDebounce() {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
   }
 
   function handleTimeRangeChange(value: string) {
@@ -522,6 +531,7 @@ function LogsExplorerContent() {
   }
 
   function clearFilters() {
+    cancelPendingSearchDebounce();
     setService('');
     setEnvironment('');
     setSeverity('');
@@ -538,6 +548,7 @@ function LogsExplorerContent() {
   }
 
   function applySavedQuery(query: SavedLogQuery) {
+    cancelPendingSearchDebounce();
     setTimeRange(query.filters.timeRange);
     setCustomFrom(query.filters.customFrom);
     setCustomTo(query.filters.customTo);
@@ -641,11 +652,11 @@ function LogsExplorerContent() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <LogSelect
+          <SelectControl
             value={timeRange}
             onChange={handleTimeRangeChange}
             aria-label="Select log time range"
-            className="min-w-44"
+            triggerClassName="min-w-44"
             options={[
               ...TIME_RANGE_OPTIONS.map((option) => ({
                 label: `Last ${option.label}`,
@@ -655,11 +666,11 @@ function LogsExplorerContent() {
             ]}
           />
 
-          <LogSelect
+          <SelectControl
             value={service}
             onChange={setService}
             aria-label="Select log service"
-            className="min-w-40"
+            triggerClassName="min-w-40"
             options={[
               { label: 'All Services', value: '' },
               ...[...new Set(services.map((entry) => entry.service_name))].map((serviceName) => ({
@@ -669,11 +680,11 @@ function LogsExplorerContent() {
             ]}
           />
 
-          <LogSelect
+          <SelectControl
             value={environment}
             onChange={setEnvironment}
             aria-label="Select log environment"
-            className="min-w-32"
+            triggerClassName="min-w-32"
             options={[
               { label: 'All Environments', value: '' },
               ...environments.map((env) => ({
@@ -683,11 +694,11 @@ function LogsExplorerContent() {
             ]}
           />
 
-          <LogSelect
+          <SelectControl
             value={severity}
             onChange={setSeverity}
             aria-label="Select log severity"
-            className="min-w-36"
+            triggerClassName="min-w-36"
             options={[
               { label: 'All Severities', value: '' },
               ...SEVERITY_OPTIONS.map((option) => ({
@@ -947,72 +958,6 @@ function LogsExplorerContent() {
   );
 }
 
-function LogSelect({
-  value,
-  onChange,
-  options,
-  className = '',
-  'aria-label': ariaLabel,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ label: string; value: string }>;
-  className?: string;
-  'aria-label': string;
-}) {
-  const normalizedValue = options.some((option) => option.value === value)
-    ? value
-    : (options[0]?.value ?? '');
-  const radixValue = toRadixSelectValue(normalizedValue);
-
-  return (
-    <Select.Root
-      value={radixValue}
-      onValueChange={(nextValue) => onChange(fromRadixSelectValue(nextValue))}
-    >
-      <Select.Trigger
-        aria-label={ariaLabel}
-        className={`rp-input flex h-10 items-center justify-between gap-3 px-3 text-left transition focus:outline-none focus:ring-2 focus:ring-cyan-400/40 data-[state=open]:border-cyan-400/50 data-[state=open]:bg-cyan-400/10 ${className}`}
-      >
-        <Select.Value />
-        <Select.Icon aria-hidden="true">
-          <ChevronDownIcon className="h-4 w-4 text-slate-500" />
-        </Select.Icon>
-      </Select.Trigger>
-      <Select.Portal>
-        <Select.Content
-          position="popper"
-          sideOffset={6}
-          className="z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-surface-border bg-slate-950/95 text-sm text-slate-200 shadow-2xl shadow-black/40 backdrop-blur"
-        >
-          <Select.Viewport className="p-1">
-            {options.map((option) => (
-              <Select.Item
-                key={`${option.value || RADIX_EMPTY_VALUE}-${option.label}`}
-                value={toRadixSelectValue(option.value)}
-                className="relative flex h-9 cursor-pointer select-none items-center rounded-md py-2 pl-8 pr-3 text-sm outline-none data-[highlighted]:bg-cyan-400/10 data-[highlighted]:text-cyan-100 data-[state=checked]:text-white"
-              >
-                <Select.ItemIndicator className="absolute left-2 flex h-4 w-4 items-center justify-center text-cyan-300">
-                  <CheckIcon className="h-3.5 w-3.5" />
-                </Select.ItemIndicator>
-                <Select.ItemText>{option.label}</Select.ItemText>
-              </Select.Item>
-            ))}
-          </Select.Viewport>
-        </Select.Content>
-      </Select.Portal>
-    </Select.Root>
-  );
-}
-
-function toRadixSelectValue(value: string): string {
-  return value === '' ? RADIX_EMPTY_VALUE : value;
-}
-
-function fromRadixSelectValue(value: string): string {
-  return value === RADIX_EMPTY_VALUE ? '' : value;
-}
-
 function FacetsSidebar({
   facets,
   onSelect,
@@ -1070,7 +1015,7 @@ function FacetsSidebar({
                 {values.length === 0 ? (
                   <p className="px-2 py-1 text-xs text-slate-600">No values</p>
                 ) : (
-                  values.slice(0, section.key === 'services' ? 6 : 5).map((facet) => (
+                  values.map((facet) => (
                     <button
                       key={`${section.key}-${facet.value}`}
                       onClick={() => onSelect(section.key, facet.value)}
@@ -1841,34 +1786,6 @@ function SearchIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
       />
-    </svg>
-  );
-}
-
-function ChevronDownIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2.5}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
     </svg>
   );
 }

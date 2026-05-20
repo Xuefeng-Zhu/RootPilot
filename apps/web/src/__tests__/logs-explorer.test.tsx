@@ -318,6 +318,84 @@ describe('LogsExplorerPage', () => {
     });
   });
 
+  it('keeps all returned non-service facet values selectable', async () => {
+    mockApiClient.mockImplementation(async (path: string) => {
+      if (path === '/v1/services') {
+        return { data: [] };
+      }
+      if (path === '/v1/logs') {
+        return {
+          data: mockLogs,
+          pagination: { cursor: null, hasMore: false },
+          facets: {
+            services: [],
+            severities: [],
+            environments: Array.from({ length: 6 }, (_, index) => ({
+              value: `env-${index + 1}`,
+              count: index + 1,
+            })),
+            error_types: [],
+            http_routes: [],
+            fingerprints: [],
+            versions: [],
+          },
+        };
+      }
+      return { data: [] };
+    });
+
+    render(<LogsExplorerPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /env-6/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /env-6/i }));
+
+    await waitFor(() => {
+      const logCalls = mockApiClient.mock.calls.filter(([path]) => path === '/v1/logs');
+      const lastCall = logCalls[logCalls.length - 1];
+      expect(lastCall[1]).toMatchObject({
+        params: expect.objectContaining({ environment: 'env-6' }),
+      });
+    });
+  });
+
+  it('cancels a pending search debounce when clearing filters', async () => {
+    mockApiClient.mockImplementation(async (path: string) => {
+      if (path === '/v1/services') {
+        return { data: [] };
+      }
+      if (path === '/v1/logs') {
+        return { data: mockLogs, pagination: { cursor: null, hasMore: false } };
+      }
+      return { data: [] };
+    });
+
+    render(<LogsExplorerPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Connection failed')).toBeInTheDocument();
+    });
+
+    vi.useFakeTimers();
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Search logs'), {
+        target: { value: 'timeout' },
+      });
+      fireEvent.click(screen.getByText('Clear all'));
+      vi.advanceTimersByTime(400);
+    });
+    vi.useRealTimers();
+
+    expect(screen.getByLabelText('Search logs')).toHaveValue('');
+    expect(
+      mockApiClient.mock.calls
+        .filter(([path]) => path === '/v1/logs')
+        .some(([, options]) => options?.params?.search === 'timeout'),
+    ).toBe(false);
+  });
+
   it('opens a structured drawer and queries nearby logs', async () => {
     mockApiClient.mockImplementation(async (path: string) => {
       if (path === '/v1/services') {
