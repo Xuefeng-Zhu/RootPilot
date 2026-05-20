@@ -98,12 +98,12 @@ describe('LogsExplorerPage', () => {
       expect(screen.getByText('Logs Explorer')).toBeInTheDocument();
     });
 
-    // Default time range buttons are visible
-    expect(screen.getByText('15m')).toBeInTheDocument();
-    expect(screen.getAllByText('1h').length).toBeGreaterThan(0);
-    expect(screen.getByText('6h')).toBeInTheDocument();
-    expect(screen.getByText('24h')).toBeInTheDocument();
-    expect(screen.getByText('7d')).toBeInTheDocument();
+    // Default compact filter controls are visible
+    expect(screen.getByLabelText('Select log time range')).toHaveDisplayValue('Last 1h');
+    expect(screen.getByLabelText('Select log service')).toHaveDisplayValue('All Services');
+    expect(screen.getByLabelText('Select log environment')).toHaveDisplayValue('All Environments');
+    expect(screen.getByLabelText('Select log severity')).toHaveDisplayValue('All Severities');
+    expect(screen.getByPlaceholderText('Search logs...')).toBeInTheDocument();
 
     // Logs rendered in table
     await waitFor(() => {
@@ -134,8 +134,9 @@ describe('LogsExplorerPage', () => {
       ([path]) => path === '/v1/logs',
     ).length;
 
-    // Click 24h time range
-    fireEvent.click(screen.getByText('24h'));
+    fireEvent.change(screen.getByLabelText('Select log time range'), {
+      target: { value: '24h' },
+    });
 
     // New API call should be made with updated time range
     await waitFor(() => {
@@ -361,6 +362,8 @@ describe('LogsExplorerPage', () => {
 
     render(<LogsExplorerPage />);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced filters' }));
+
     await waitFor(() => {
       expect(screen.getByText('Checkout errors last 30m')).toBeInTheDocument();
     });
@@ -408,6 +411,8 @@ describe('LogsExplorerPage', () => {
     });
 
     render(<LogsExplorerPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced filters' }));
 
     fireEvent.change(screen.getByPlaceholderText('trace_id'), { target: { value: 'trace-abc' } });
     fireEvent.change(screen.getByPlaceholderText('span_id'), { target: { value: 'span-abc' } });
