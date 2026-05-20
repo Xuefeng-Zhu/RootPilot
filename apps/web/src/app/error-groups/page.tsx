@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import type { ErrorGroup } from '@rootpilot/shared';
 import { apiClient } from '../../lib/api';
 import { formatNumber, formatTimestamp } from '../../lib/format';
+import { EmptyState, ErrorState, PageTitle, Panel, StatusBadge } from '../../components/ui';
 
 interface ErrorGroupsResponse {
   data: ErrorGroup[];
@@ -60,12 +61,10 @@ function ErrorGroupsContent() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Error Groups</h1>
-        <p className="text-sm text-gray-400 mt-1">
-          Deterministic fingerprints from error logs and failed spans.
-        </p>
-      </div>
+      <PageTitle
+        title="Error Groups"
+        description="Deterministic fingerprints from error logs and failed spans."
+      />
 
       <div className="flex flex-wrap gap-3">
         <input
@@ -73,13 +72,13 @@ function ErrorGroupsContent() {
           onChange={(event) => setService(event.target.value)}
           placeholder="Filter service..."
           aria-label="Filter error groups by service"
-          className="w-64 px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
+          className="rp-input w-64"
         />
         <select
           value={environment}
           onChange={(event) => setEnvironment(event.target.value)}
           aria-label="Filter error groups by environment"
-          className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
+          className="rp-input"
         >
           <option value="">All Environments</option>
           {environments.map((name) => (
@@ -88,7 +87,7 @@ function ErrorGroupsContent() {
             </option>
           ))}
         </select>
-        <label className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300">
+        <label className="inline-flex items-center gap-2 rounded-md border border-surface-border bg-surface-subtle px-3 py-2 text-sm text-slate-300">
           <input
             type="checkbox"
             checked={onlyNew}
@@ -99,86 +98,86 @@ function ErrorGroupsContent() {
         </label>
       </div>
 
-      {loading && <div className="text-gray-400">Loading error groups...</div>}
-
-      {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
-          {error}
-        </div>
+      {loading && (
+        <Panel>
+          <div className="p-8 text-center text-sm text-slate-400">Loading error groups...</div>
+        </Panel>
       )}
 
+      {error && <ErrorState message={error} />}
+
       {!loading && !error && groups.length === 0 && (
-        <div className="bg-surface-card border border-surface-border rounded-lg p-8 text-center">
-          <p className="text-gray-400">No error groups found.</p>
-          <p className="text-gray-500 text-sm mt-2">
-            Run a failure scenario, then `npm run correlations:refresh`.
-          </p>
-        </div>
+        <EmptyState
+          title="No error groups found"
+          description="Run a failure scenario, then npm run correlations:refresh."
+        />
       )}
 
       {!loading && !error && groups.length > 0 && (
-        <div className="overflow-x-auto border border-surface-border rounded-lg">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-400 uppercase border-b border-surface-border bg-surface-card/60">
-              <tr>
-                <th className="px-4 py-3">Group</th>
-                <th className="px-4 py-3">Service</th>
-                <th className="px-4 py-3">Environment</th>
-                <th className="px-4 py-3">Count</th>
-                <th className="px-4 py-3">Traces</th>
-                <th className="px-4 py-3">First Seen</th>
-                <th className="px-4 py-3">Last Seen</th>
-                <th className="px-4 py-3">Example Trace</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map((group) => (
-                <tr
-                  key={group.id}
-                  className="border-b border-surface-border last:border-b-0 hover:bg-surface-card/50"
-                >
-                  <td className="px-4 py-3 min-w-[320px]">
-                    <p className="font-medium text-red-300">
-                      {group.error_type ?? group.normalized_message}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate max-w-[420px]">
-                      {group.example_message}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-white">
-                    <Link
-                      href={`/services/${encodeURIComponent(group.service_name)}?environment=${encodeURIComponent(group.environment)}`}
-                      className="hover:text-sidebar-active"
-                    >
-                      {group.service_name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">{group.environment}</td>
-                  <td className="px-4 py-3 text-gray-300">{formatNumber(group.count)}</td>
-                  <td className="px-4 py-3 text-gray-300">
-                    {formatNumber(group.affected_traces_count)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">
-                    {formatTimestamp(group.first_seen_at)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">{formatTimestamp(group.last_seen_at)}</td>
-                  <td className="px-4 py-3">
-                    {group.example_trace_id ? (
-                      <Link
-                        href={`/traces/${encodeURIComponent(group.example_trace_id)}`}
-                        className="text-sidebar-active hover:text-white"
-                      >
-                        Open trace
-                      </Link>
-                    ) : (
-                      <span className="text-gray-500">-</span>
-                    )}
-                  </td>
+        <Panel className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="rp-table">
+              <thead>
+                <tr>
+                  <th>Group</th>
+                  <th>Service</th>
+                  <th>Environment</th>
+                  <th>Severity</th>
+                  <th>Count</th>
+                  <th>Traces</th>
+                  <th>First Seen</th>
+                  <th>Last Seen</th>
+                  <th>Example Trace</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {groups.map((group) => (
+                  <tr key={group.id}>
+                    <td className="min-w-[320px]">
+                      <Link
+                        href={`/error-groups/${encodeURIComponent(group.id)}`}
+                        className="font-medium text-red-300 hover:text-red-100"
+                      >
+                        {group.error_type ?? group.normalized_message}
+                      </Link>
+                      <p className="max-w-[420px] truncate text-xs text-gray-500">
+                        {group.example_message}
+                      </p>
+                    </td>
+                    <td className="text-white">
+                      <Link
+                        href={`/services/${encodeURIComponent(group.service_name)}?environment=${encodeURIComponent(group.environment)}`}
+                        className="hover:text-cyan-300"
+                      >
+                        {group.service_name}
+                      </Link>
+                    </td>
+                    <td>{group.environment}</td>
+                    <td>
+                      <StatusBadge status={group.severity} />
+                    </td>
+                    <td>{formatNumber(group.count)}</td>
+                    <td>{formatNumber(group.affected_traces_count)}</td>
+                    <td>{formatTimestamp(group.first_seen_at)}</td>
+                    <td>{formatTimestamp(group.last_seen_at)}</td>
+                    <td>
+                      {group.example_trace_id ? (
+                        <Link
+                          href={`/traces/${encodeURIComponent(group.example_trace_id)}`}
+                          className="text-cyan-300 hover:text-white"
+                        >
+                          Open trace
+                        </Link>
+                      ) : (
+                        <span className="text-gray-500">-</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
       )}
     </div>
   );

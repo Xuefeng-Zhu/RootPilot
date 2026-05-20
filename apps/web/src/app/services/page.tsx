@@ -4,14 +4,16 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { ServiceSummary } from '@rootpilot/shared';
 import { apiClient } from '../../lib/api';
+import { formatMs, formatNumber, formatPercent, formatTimestamp } from '../../lib/format';
 import {
-  formatMs,
-  formatNumber,
-  formatPercent,
-  formatTimestamp,
-  healthColor,
-  healthTextColor,
-} from '../../lib/format';
+  EmptyState,
+  ErrorState,
+  HealthBadge,
+  PageTitle,
+  Panel,
+  ServiceHealthBar,
+  StatCard,
+} from '../../components/ui';
 
 interface ServicesResponse {
   data: ServiceSummary[];
@@ -72,179 +74,165 @@ export default function ServicesPage() {
     setHealthFilter('');
   };
 
+  const healthCounts = {
+    healthy: services.filter((service) => service.health_status === 'healthy').length,
+    warning: services.filter((service) => service.health_status === 'warning').length,
+    critical: services.filter((service) => service.health_status === 'degraded').length,
+    unknown: services.filter((service) => service.health_status === 'unknown').length,
+  };
+
   return (
-    <div>
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Service Catalog</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Discovered services, health, dependencies, and recent deployment context.
-          </p>
-        </div>
-        <Link
-          href="/service-map"
-          className="px-3 py-2 text-sm bg-sidebar-active text-white rounded border border-sidebar-active hover:bg-sidebar-active/80"
-        >
-          Open Service Map
-        </Link>
-      </div>
+    <div className="space-y-5">
+      <PageTitle
+        title="Services"
+        description="Discovered services, health, dependencies, and deployment context."
+        actions={
+          <Link href="/service-map" className="rp-button rp-button-primary">
+            Open Service Map
+          </Link>
+        }
+      />
 
-      {loading && <div className="text-gray-400">Loading services...</div>}
-
-      {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
-          {error}
-        </div>
+      {loading && (
+        <Panel>
+          <div className="p-8 text-center text-sm text-slate-400">Loading services...</div>
+        </Panel>
       )}
 
+      {error && <ErrorState message={error} />}
+
       {!loading && !error && services.length === 0 && (
-        <div className="bg-surface-card border border-surface-border rounded-lg p-8 text-center">
-          <p className="text-gray-400 text-lg">No services found</p>
-          <p className="text-gray-500 text-sm mt-2">
-            Run the simulator and then `npm run correlations:refresh` to populate service summaries.
-          </p>
-        </div>
+        <EmptyState
+          title="No services found"
+          description="Run the simulator and then npm run correlations:refresh to populate service summaries."
+        />
       )}
 
       {!loading && !error && services.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="text"
-              value={serviceFilter}
-              onChange={(event) => setServiceFilter(event.target.value)}
-              placeholder="Filter services..."
-              aria-label="Filter services by name"
-              className="w-64 px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 placeholder-gray-500 focus:outline-none focus:border-sidebar-active"
-            />
-
-            <select
-              value={environmentFilter}
-              onChange={(event) => setEnvironmentFilter(event.target.value)}
-              aria-label="Filter services by environment"
-              className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
-            >
-              <option value="">All Environments</option>
-              {environments.map((environmentName) => (
-                <option key={environmentName} value={environmentName}>
-                  {environmentName}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={healthFilter}
-              onChange={(event) => setHealthFilter(event.target.value)}
-              aria-label="Filter services by health"
-              className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 focus:outline-none focus:border-sidebar-active"
-            >
-              <option value="">All Health</option>
-              {HEALTH_FILTERS.map((healthLabel) => (
-                <option key={healthLabel} value={healthLabel}>
-                  {titleCase(healthLabel)}
-                </option>
-              ))}
-            </select>
-
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-400 hover:text-white hover:bg-surface-border transition-colors"
-              >
-                Clear
-              </button>
-            )}
-
-            <div className="ml-auto text-xs text-gray-500">
-              {filteredServices.length} of {services.length} services
-            </div>
+        <>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <StatCard label="Total Services" value={services.length} tone="info" />
+            <StatCard label="Healthy" value={healthCounts.healthy} tone="good" />
+            <StatCard label="Warning" value={healthCounts.warning} tone="warn" />
+            <StatCard label="Critical" value={healthCounts.critical} tone="bad" />
+            <Panel className="p-4 md:col-span-2 xl:col-span-1">
+              <ServiceHealthBar {...healthCounts} />
+            </Panel>
           </div>
 
-          {filteredServices.length === 0 ? (
-            <div className="border border-surface-border rounded p-8 text-center">
-              <p className="text-gray-400 text-sm">No services match the current filters.</p>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="text"
+                value={serviceFilter}
+                onChange={(event) => setServiceFilter(event.target.value)}
+                placeholder="Filter services..."
+                aria-label="Filter services by name"
+                className="rp-input w-64"
+              />
+
+              <select
+                value={environmentFilter}
+                onChange={(event) => setEnvironmentFilter(event.target.value)}
+                aria-label="Filter services by environment"
+                className="rp-input"
+              >
+                <option value="">All Environments</option>
+                {environments.map((environmentName) => (
+                  <option key={environmentName} value={environmentName}>
+                    {environmentName}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={healthFilter}
+                onChange={(event) => setHealthFilter(event.target.value)}
+                aria-label="Filter services by health"
+                className="rp-input"
+              >
+                <option value="">All Health</option>
+                {HEALTH_FILTERS.map((healthLabel) => (
+                  <option key={healthLabel} value={healthLabel}>
+                    {titleCase(healthLabel)}
+                  </option>
+                ))}
+              </select>
+
+              {hasActiveFilters && (
+                <button type="button" onClick={clearFilters} className="rp-button">
+                  Clear
+                </button>
+              )}
+
+              <div className="ml-auto text-xs text-gray-500">
+                {filteredServices.length} of {services.length} services
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto border border-surface-border rounded-lg">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-400 uppercase border-b border-surface-border bg-surface-card/60">
-                  <tr>
-                    <th className="px-4 py-3">Service</th>
-                    <th className="px-4 py-3">Environment</th>
-                    <th className="px-4 py-3">Health</th>
-                    <th className="px-4 py-3">Requests</th>
-                    <th className="px-4 py-3">Errors</th>
-                    <th className="px-4 py-3">Error Rate</th>
-                    <th className="px-4 py-3">p95 Latency</th>
-                    <th className="px-4 py-3">Deps</th>
-                    <th className="px-4 py-3">Latest Deploy</th>
-                    <th className="px-4 py-3">Last Seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredServices.map((service) => (
-                    <tr
-                      key={`${service.service_name}-${service.environment}`}
-                      className="border-b border-surface-border last:border-b-0 hover:bg-surface-card/50 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-medium text-white">
-                        <Link
-                          href={`/services/${encodeURIComponent(service.service_name)}?environment=${encodeURIComponent(service.environment)}`}
-                          className="hover:text-sidebar-active"
-                        >
-                          {service.service_name}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded text-xs bg-surface-card border border-surface-border text-gray-300">
-                          {service.environment}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="flex items-center gap-2">
-                          <span
-                            className={`w-2 h-2 rounded-full ${healthColor(service.health_status)}`}
-                          />
-                          <span className={healthTextColor(service.health_status)}>
-                            {titleCase(service.health_status)}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-300">
-                        {formatNumber(service.request_count)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-300">
-                        {formatNumber(service.error_count)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {formatPercent(service.error_count, service.request_count)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {formatMs(service.p95_latency_ms)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {formatNumber(service.dependency_count)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {service.latest_version ? (
-                          <code className="text-xs bg-surface-card px-1.5 py-0.5 rounded">
-                            {service.latest_version}
-                          </code>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        {formatTimestamp(service.last_seen_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+
+            {filteredServices.length === 0 ? (
+              <EmptyState title="No services match the current filters" />
+            ) : (
+              <Panel className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="rp-table">
+                    <thead>
+                      <tr>
+                        <th>Service</th>
+                        <th>Environment</th>
+                        <th>Health</th>
+                        <th>Requests</th>
+                        <th>Errors</th>
+                        <th>Error Rate</th>
+                        <th>p95 Latency</th>
+                        <th>Deps</th>
+                        <th>Latest Deploy</th>
+                        <th>Last Seen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredServices.map((service) => (
+                        <tr key={`${service.service_name}-${service.environment}`}>
+                          <td className="font-medium text-white">
+                            <Link
+                              href={`/services/${encodeURIComponent(service.service_name)}?environment=${encodeURIComponent(service.environment)}`}
+                              className="hover:text-cyan-300"
+                            >
+                              {service.service_name}
+                            </Link>
+                          </td>
+                          <td>
+                            <span className="rounded border border-surface-border bg-surface-subtle px-2 py-0.5 text-xs text-slate-300">
+                              {service.environment}
+                            </span>
+                          </td>
+                          <td>
+                            <HealthBadge status={service.health_status} />
+                          </td>
+                          <td>{formatNumber(service.request_count)}</td>
+                          <td>{formatNumber(service.error_count)}</td>
+                          <td>{formatPercent(service.error_count, service.request_count)}</td>
+                          <td>{formatMs(service.p95_latency_ms)}</td>
+                          <td>{formatNumber(service.dependency_count)}</td>
+                          <td>
+                            {service.latest_version ? (
+                              <code className="rounded bg-surface-subtle px-1.5 py-0.5 text-xs">
+                                {service.latest_version}
+                              </code>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td>{formatTimestamp(service.last_seen_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

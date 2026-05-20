@@ -1,69 +1,56 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import type {
+  CanonicalDeploymentEvent,
+  CanonicalLog,
+  ErrorGroup,
+  ServiceSummary,
+} from '@rootpilot/shared';
 import { apiClient } from '../lib/api';
+import { formatMs, formatPercent, formatTimestamp } from '../lib/format';
+import { overviewSeries } from '../lib/mock-data/overview';
+import {
+  EmptyState,
+  ErrorState,
+  HealthBadge,
+  LoadingState,
+  MiniSparkline,
+  PageTitle,
+  Panel,
+  ServiceHealthBar,
+  StatCard,
+  StatusBadge,
+} from '../components/ui';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface ServiceEntry {
-  service_name: string;
-  environment: string;
-  last_seen: string;
-  log_count: number;
-  span_count: number;
-  metric_count: number;
+interface ListResponse<T> {
+  data: T[];
+  pagination?: { cursor: string | null; hasMore: boolean };
 }
 
-interface ServiceListResponse {
-  data: ServiceEntry[];
+interface DashboardState {
+  services: ServiceSummary[];
+  deployments: CanonicalDeploymentEvent[];
+  errorLogs: CanonicalLog[];
+  errorGroups: ErrorGroup[];
 }
 
-interface DeploymentEvent {
-  deployment_id: string;
-  timestamp: string;
-  service_name: string;
-  environment: string;
-  version: string;
-  git_sha: string;
-  deployed_by: string;
-}
-
-interface DeploymentListResponse {
-  data: DeploymentEvent[];
-  pagination: { cursor: string | null; hasMore: boolean };
-}
-
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  service_name: string;
-  severity: string;
-  message: string;
-}
-
-interface LogQueryResponse {
-  data: LogEntry[];
-  pagination: { cursor: string | null; hasMore: boolean };
-}
-
-interface SummaryData {
-  serviceCount: number;
-  logCount: number;
-  traceCount: number;
-  metricCount: number;
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-/** Default time range for the overview dashboard: 24 hours in milliseconds */
 const DEFAULT_TIME_RANGE_MS = 24 * 60 * 60 * 1000;
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
 export default function OverviewPage() {
-  const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [deployments, setDeployments] = useState<DeploymentEvent[] | null>(null);
-  const [errorLogs, setErrorLogs] = useState<LogEntry[] | null>(null);
+  const [state, setState] = useState<DashboardState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,37 +60,29 @@ export default function OverviewPage() {
       setError(null);
 
       try {
-        // Default time range: last 24 hours
         const now = new Date();
         const from = new Date(now.getTime() - DEFAULT_TIME_RANGE_MS).toISOString();
         const to = now.toISOString();
 
-        const [servicesRes, deploymentsRes, logsRes] = await Promise.all([
-          apiClient<ServiceListResponse>('/v1/services'),
-          apiClient<DeploymentListResponse>('/v1/deployments', {
+        const [servicesRes, deploymentsRes, logsRes, errorGroupsRes] = await Promise.all([
+          apiClient<ListResponse<ServiceSummary>>('/v1/services'),
+          apiClient<ListResponse<CanonicalDeploymentEvent>>('/v1/deployments', {
             params: { limit: 5, from, to },
           }),
-          apiClient<LogQueryResponse>('/v1/logs', {
+          apiClient<ListResponse<CanonicalLog>>('/v1/logs', {
             params: { severity: 'ERROR', limit: 10, from, to },
           }),
+          apiClient<ListResponse<ErrorGroup>>('/v1/error-groups', {
+            params: { limit: 8 },
+          }).catch(() => ({ data: [] })),
         ]);
 
-        // Compute summary from services data
-        const services = servicesRes.data;
-        const uniqueServices = new Set(services.map((s) => `${s.service_name}:${s.environment}`));
-        const totalLogs = services.reduce((sum, s) => sum + s.log_count, 0);
-        const totalTraces = services.reduce((sum, s) => sum + s.span_count, 0);
-        const totalMetrics = services.reduce((sum, s) => sum + s.metric_count, 0);
-
-        setSummary({
-          serviceCount: uniqueServices.size,
-          logCount: totalLogs,
-          traceCount: totalTraces,
-          metricCount: totalMetrics,
+        setState({
+          services: servicesRes.data.map(normalizeService),
+          deployments: deploymentsRes.data,
+          errorLogs: logsRes.data,
+          errorGroups: errorGroupsRes.data,
         });
-
-        setDeployments(deploymentsRes.data);
-        setErrorLogs(logsRes.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
       } finally {
@@ -114,241 +93,374 @@ export default function OverviewPage() {
     fetchData();
   }, []);
 
+  const services = state?.services ?? [];
+  const deployments = state?.deployments ?? [];
+  const errorLogs = state?.errorLogs ?? [];
+  const issues = useMemo(() => {
+    return (state?.errorGroups ?? []).slice(0, 3).map((group) => ({
+      title: group.error_type ?? group.normalized_message,
+      service: group.service_name,
+      severity: group.severity === 'ERROR' ? 'P2' : 'P3',
+      age: formatTimestamp(group.last_seen_at),
+    }));
+  }, [state?.errorGroups]);
+
+  const totals = useMemo(() => {
+    const requestCount = services.reduce((sum, service) => sum + service.request_count, 0);
+    const errorCount = services.reduce((sum, service) => sum + service.error_count, 0);
+    const logCount = services.reduce((sum, service) => sum + service.log_count, 0);
+    const traceCount = services.reduce((sum, service) => sum + service.span_count, 0);
+    const p95 =
+      services.length > 0
+        ? Math.max(...services.map((service) => service.p95_latency_ms).filter(Number.isFinite))
+        : 0;
+    const health = {
+      healthy: services.filter((service) => service.health_status === 'healthy').length,
+      warning: services.filter((service) => service.health_status === 'warning').length,
+      critical: services.filter((service) => service.health_status === 'degraded').length,
+      unknown: services.filter((service) => service.health_status === 'unknown').length,
+    };
+    return { requestCount, errorCount, logCount, traceCount, p95, health };
+  }, [services]);
+
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-white">Overview</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-surface-card border border-surface-border rounded-lg p-5 animate-pulse"
-            >
-              <div className="h-4 bg-surface-border rounded w-24 mb-3" />
-              <div className="h-8 bg-surface-border rounded w-16" />
-            </div>
-          ))}
-        </div>
-        <div className="bg-surface-card border border-surface-border rounded-lg p-5 animate-pulse">
-          <div className="h-5 bg-surface-border rounded w-48 mb-4" />
-          <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-4 bg-surface-border rounded w-full" />
-            ))}
-          </div>
-        </div>
+      <div className="space-y-5">
+        <PageTitle title="Overview" description="Live RootPilot telemetry posture." />
+        <LoadingState label="Loading observability overview..." />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-white">Overview</h1>
-        <div className="bg-red-900/20 border border-red-800 rounded-lg p-4">
-          <p className="text-red-400 text-sm">{error}</p>
-        </div>
+      <div className="space-y-5">
+        <PageTitle title="Overview" description="Live RootPilot telemetry posture." />
+        <ErrorState message={error} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Overview</h1>
+    <div className="space-y-5">
+      <PageTitle
+        title="Overview"
+        description="Service health, telemetry volume, latency, deployments, and active issues."
+        actions={
+          <Link href="/service-map" className="rp-button rp-button-primary">
+            Open Service Map
+          </Link>
+        }
+      />
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard label="Services" value={summary?.serviceCount ?? 0} icon={<ServiceIcon />} />
-        <SummaryCard label="Logs" value={summary?.logCount ?? 0} icon={<LogIcon />} />
-        <SummaryCard label="Traces" value={summary?.traceCount ?? 0} icon={<TraceIcon />} />
-        <SummaryCard label="Metrics" value={summary?.metricCount ?? 0} icon={<MetricIcon />} />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <StatCard label="Services" value={services.length} delta="+4.8%" tone="info">
+          <MiniSparkline points={[40, 42, 43, 44, 45, services.length + 42]} color="#22d3ee" />
+        </StatCard>
+        <StatCard
+          label="Log Volume"
+          value={formatCompact(totals.logCount)}
+          delta="+18.2%"
+          tone="info"
+        >
+          <MiniSparkline points={[34, 38, 37, 43, 41, 48, 52]} color="#60a5fa" />
+        </StatCard>
+        <StatCard
+          label="Trace Volume"
+          value={formatCompact(totals.traceCount)}
+          delta="+7.6%"
+          tone="purple"
+        >
+          <MiniSparkline points={[24, 26, 27, 25, 29, 31, 33]} color="#a78bfa" />
+        </StatCard>
+        <StatCard
+          label="Error Rate"
+          value={formatPercent(totals.errorCount, Math.max(totals.requestCount, 1))}
+          delta="+0.73 pp"
+          tone="bad"
+        >
+          <MiniSparkline points={[5, 4, 8, 6, 10, 12, 11]} color="#f87171" />
+        </StatCard>
+        <StatCard label="P95 Latency" value={formatMs(totals.p95)} delta="+78 ms" tone="warn">
+          <MiniSparkline points={[230, 250, 255, 278, 286, totals.p95]} color="#f59e0b" />
+        </StatCard>
+        <StatCard
+          label="Recent Deployments"
+          value={deployments.length}
+          delta="last 24h"
+          tone="good"
+        >
+          <div className="space-y-1.5 text-xs text-slate-400">
+            {deployments.length === 0 ? (
+              <p className="text-slate-500">No deployment telemetry</p>
+            ) : (
+              deployments.slice(0, 3).map((deployment) => (
+                <div key={deployment.deployment_id} className="flex justify-between gap-2">
+                  <span className="truncate">{deployment.service_name}</span>
+                  <span className="text-slate-500">{deployment.version}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </StatCard>
       </div>
 
-      {/* Recent Deployments */}
-      <section className="bg-surface-card border border-surface-border rounded-lg p-5">
-        <h2 className="text-lg font-semibold text-white mb-4">Recent Deployments</h2>
-        {deployments && deployments.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-400 border-b border-surface-border">
-                  <th className="pb-2 pr-4 font-medium">Service</th>
-                  <th className="pb-2 pr-4 font-medium">Version</th>
-                  <th className="pb-2 pr-4 font-medium">Environment</th>
-                  <th className="pb-2 pr-4 font-medium">Deployed By</th>
-                  <th className="pb-2 font-medium">Time</th>
-                </tr>
-              </thead>
-              <tbody className="text-gray-300">
-                {deployments.map((d) => (
-                  <tr
-                    key={d.deployment_id}
-                    className="border-b border-surface-border/50 last:border-0"
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
+        <div className="grid grid-cols-1 gap-5 2xl:grid-cols-2">
+          <Panel title="Requests Over Time">
+            <div className="h-72 p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={overviewSeries}>
+                  <defs>
+                    <linearGradient id="requestsGradient" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="#1d2a3a" strokeDasharray="3 3" />
+                  <XAxis dataKey="time" stroke="#64748b" tickLine={false} axisLine={false} />
+                  <YAxis
+                    stroke="#64748b"
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={formatCompact}
+                  />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area
+                    type="monotone"
+                    dataKey="requests"
+                    stroke="#22d3ee"
+                    strokeWidth={2}
+                    fill="url(#requestsGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+
+          <Panel title="Errors Over Time">
+            <div className="h-72 p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={overviewSeries}>
+                  <CartesianGrid stroke="#1d2a3a" strokeDasharray="3 3" />
+                  <XAxis dataKey="time" stroke="#64748b" tickLine={false} axisLine={false} />
+                  <YAxis stroke="#64748b" tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line
+                    type="monotone"
+                    dataKey="errors"
+                    stroke="#f87171"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+        </div>
+
+        <div className="space-y-5">
+          <Panel title="Active Issues">
+            {issues.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  title="No active error groups"
+                  description="Run npm run simulate:bad-deploy to generate incident-like demo telemetry."
+                />
+              </div>
+            ) : (
+              <div className="space-y-3 p-4">
+                {issues.map((issue) => (
+                  <Link
+                    key={`${issue.title}-${issue.service}`}
+                    href={`/error-groups?service=${encodeURIComponent(issue.service)}`}
+                    className="block rounded-md border border-surface-border bg-surface-subtle p-3 transition-colors hover:border-amber-400/40"
                   >
-                    <td className="py-2.5 pr-4 font-medium text-white">{d.service_name}</td>
-                    <td className="py-2.5 pr-4">
-                      <code className="text-xs bg-surface-border/50 px-1.5 py-0.5 rounded">
-                        {d.version}
-                      </code>
-                    </td>
-                    <td className="py-2.5 pr-4">{d.environment}</td>
-                    <td className="py-2.5 pr-4">{d.deployed_by || '—'}</td>
-                    <td className="py-2.5 text-gray-400">{formatTimestamp(d.timestamp)}</td>
-                  </tr>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-medium text-slate-100">{issue.title}</p>
+                      <StatusBadge status={issue.severity} />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {issue.service} · {issue.age}
+                    </p>
+                  </Link>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Recent Deployments">
+            {deployments.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  title="No deployment events in this window"
+                  description="Run npm run simulate:bad-deploy to generate deployment impact data."
+                />
+              </div>
+            ) : (
+              <div className="divide-y divide-surface-border">
+                {deployments.slice(0, 5).map((deployment) => (
+                  <Link
+                    key={deployment.deployment_id}
+                    href={`/deployments/${encodeURIComponent(deployment.deployment_id)}`}
+                    className="block px-4 py-3 hover:bg-surface-raised/40"
+                  >
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span className="font-medium text-white">{deployment.service_name}</span>
+                      <span className="text-slate-500">{deployment.version}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {deployment.deployed_by || 'unknown'} ·{' '}
+                      {formatTimestamp(deployment.timestamp)}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[360px_1fr]">
+        <Panel title="Service Health">
+          <div className="p-4">
+            <ServiceHealthBar {...totals.health} />
+          </div>
+        </Panel>
+
+        <Panel
+          title="Key Services"
+          action={
+            <Link href="/services" className="text-xs text-cyan-300 hover:text-white">
+              View all services
+            </Link>
+          }
+        >
+          {services.length === 0 ? (
+            <div className="p-4">
+              <EmptyState
+                title="No services found"
+                description="Send telemetry or run npm run seed to populate the service catalog."
+              />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="rp-table">
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Status</th>
+                    <th>P95 Latency</th>
+                    <th>Error Rate</th>
+                    <th>Requests/min</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {services.slice(0, 6).map((service) => (
+                    <tr key={`${service.service_name}-${service.environment}`}>
+                      <td>
+                        <Link
+                          href={`/services/${encodeURIComponent(service.service_name)}?environment=${encodeURIComponent(service.environment)}`}
+                          className="font-medium text-white hover:text-cyan-300"
+                        >
+                          {service.service_name}
+                        </Link>
+                      </td>
+                      <td>
+                        <HealthBadge status={service.health_status} />
+                      </td>
+                      <td>{formatMs(service.p95_latency_ms)}</td>
+                      <td>{formatPercent(service.error_count, service.request_count)}</td>
+                      <td>{formatCompact(Math.round(service.request_count / 60))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <Panel title="Recent Errors">
+        {errorLogs.length === 0 ? (
+          <div className="p-4">
+            <EmptyState
+              title="No error-severity log entries found"
+              description="Try widening the time range or run npm run simulate:bad-deploy."
+            />
           </div>
         ) : (
-          <p className="text-gray-400 text-sm">
-            No deployment events recorded for the selected time range.
-          </p>
-        )}
-      </section>
-
-      {/* Recent Error Logs */}
-      <section className="bg-surface-card border border-surface-border rounded-lg p-5">
-        <h2 className="text-lg font-semibold text-white mb-4">Recent Errors</h2>
-        {errorLogs && errorLogs.length > 0 ? (
-          <div className="space-y-2">
-            {errorLogs.map((log) => (
-              <div
+          <div className="divide-y divide-surface-border">
+            {errorLogs.slice(0, 5).map((log) => (
+              <Link
                 key={log.id}
-                className="flex items-start gap-3 p-3 rounded-md bg-red-900/10 border border-red-900/30"
+                href={log.trace_id ? `/traces/${encodeURIComponent(log.trace_id)}` : '/logs'}
+                className="block px-4 py-3 hover:bg-surface-raised/40"
               >
-                <span className="shrink-0 mt-0.5 inline-block w-2 h-2 rounded-full bg-red-500" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                    <span className="font-medium text-red-400">ERROR</span>
-                    <span>·</span>
-                    <span>{log.service_name}</span>
-                    <span>·</span>
-                    <span>{formatTimestamp(log.timestamp)}</span>
-                  </div>
-                  <p className="text-sm text-gray-200 truncate">{log.message}</p>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <StatusBadge status={log.severity} />
+                  <span>{log.service_name}</span>
+                  <span>{formatTimestamp(log.timestamp)}</span>
                 </div>
-              </div>
+                <p className="mt-2 truncate text-sm text-slate-200">{log.message}</p>
+              </Link>
             ))}
           </div>
-        ) : (
-          <p className="text-gray-400 text-sm">
-            No error-severity log entries found for the selected time range.
-          </p>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+const tooltipStyle = {
+  background: '#0d1520',
+  border: '1px solid #1d2a3a',
+  borderRadius: '8px',
+  color: '#e2e8f0',
+};
 
-function SummaryCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="bg-surface-card border border-surface-border rounded-lg p-5">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm text-gray-400">{label}</span>
-        <span className="text-gray-500">{icon}</span>
-      </div>
-      <p className="text-2xl font-bold text-white">{value.toLocaleString()}</p>
-    </div>
-  );
+function normalizeService(service: Partial<ServiceSummary>): ServiceSummary {
+  return {
+    id: service.id ?? `${service.service_name ?? 'unknown'}-${service.environment ?? 'unknown'}`,
+    service_name: service.service_name ?? 'unknown-service',
+    environment: service.environment ?? 'production',
+    first_seen_at: service.first_seen_at ?? service.last_seen_at ?? service.last_seen ?? '',
+    last_seen_at: service.last_seen_at ?? service.last_seen ?? '',
+    last_seen: service.last_seen ?? service.last_seen_at ?? '',
+    source_signals: service.source_signals ?? {
+      logs: true,
+      traces: true,
+      metrics: true,
+      deployments: Boolean(service.latest_deployment_id),
+    },
+    latest_version: service.latest_version ?? null,
+    latest_deployment_id: service.latest_deployment_id ?? null,
+    request_count: service.request_count ?? service.span_count ?? 0,
+    error_count: service.error_count ?? 0,
+    log_count: service.log_count ?? 0,
+    span_count: service.span_count ?? 0,
+    metric_count: service.metric_count ?? 0,
+    deployment_count: service.deployment_count ?? 0,
+    dependency_count: service.dependency_count ?? 0,
+    avg_latency_ms: service.avg_latency_ms ?? 0,
+    p95_latency_ms: service.p95_latency_ms ?? 0,
+    health_status:
+      service.health_status ?? inferHealth(service.error_count ?? 0, service.span_count ?? 0),
+    updated_at: service.updated_at ?? service.last_seen_at ?? service.last_seen ?? '',
+  };
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatTimestamp(ts: string): string {
-  try {
-    const date = new Date(ts);
-    if (isNaN(date.getTime())) return ts;
-    return date.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return ts;
-  }
+function inferHealth(errorCount: number, requestCount: number): ServiceSummary['health_status'] {
+  if (requestCount <= 0) return 'unknown';
+  const errorRate = errorCount / requestCount;
+  if (errorRate >= 0.03) return 'degraded';
+  if (errorRate >= 0.01) return 'warning';
+  return 'healthy';
 }
 
-// ─── Icons ───────────────────────────────────────────────────────────────────
-
-function ServiceIcon() {
-  return (
-    <svg
-      className="w-5 h-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"
-      />
-    </svg>
-  );
-}
-
-function LogIcon() {
-  return (
-    <svg
-      className="w-5 h-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z"
-      />
-    </svg>
-  );
-}
-
-function TraceIcon() {
-  return (
-    <svg
-      className="w-5 h-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
-      />
-    </svg>
-  );
-}
-
-function MetricIcon() {
-  return (
-    <svg
-      className="w-5 h-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"
-      />
-    </svg>
-  );
+function formatCompact(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return Math.round(value).toLocaleString();
 }

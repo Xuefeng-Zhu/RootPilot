@@ -10,14 +10,16 @@ import type {
   TimelineEvent,
 } from '@rootpilot/shared';
 import { apiClient } from '../../../lib/api';
+import { formatMs, formatNumber, formatPercent, formatTimestamp } from '../../../lib/format';
 import {
-  formatMs,
-  formatNumber,
-  formatPercent,
-  formatTimestamp,
-  healthColor,
-  healthTextColor,
-} from '../../../lib/format';
+  EmptyState,
+  ErrorState,
+  HealthBadge,
+  PageTitle,
+  Panel,
+  StatCard as SummaryCard,
+  StatusBadge,
+} from '../../../components/ui';
 
 interface DataResponse<T> {
   data: T;
@@ -147,8 +149,10 @@ function ServiceDetailContent() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-white">{serviceName}</h1>
-        <div className="text-gray-400">Loading service details...</div>
+        <PageTitle title={serviceName} description="Loading service details..." />
+        <Panel>
+          <div className="p-8 text-center text-sm text-slate-400">Loading service details...</div>
+        </Panel>
       </div>
     );
   }
@@ -156,47 +160,54 @@ function ServiceDetailContent() {
   if (error || !state) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-white">{serviceName}</h1>
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
-          {error ?? 'Service not found'}
-        </div>
+        <PageTitle title={serviceName} />
+        <ErrorState message={error ?? 'Service not found'} />
       </div>
     );
   }
 
   const { service } = state;
+  const availability = Math.max(
+    0,
+    100 - (service.request_count > 0 ? (service.error_count / service.request_count) * 100 : 0),
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white">{service.service_name}</h1>
-            <span className={`w-2.5 h-2.5 rounded-full ${healthColor(service.health_status)}`} />
-            <span className={healthTextColor(service.health_status)}>
-              {titleCase(service.health_status)}
-            </span>
-          </div>
-          <p className="text-sm text-gray-400 mt-1">
-            {service.environment} · Last seen {formatTimestamp(service.last_seen_at)}
-          </p>
-        </div>
-        <Link
-          href="/service-map"
-          className="px-3 py-2 text-sm bg-surface-card border border-surface-border rounded text-gray-300 hover:text-white"
-        >
-          Back to Service Map
-        </Link>
-      </div>
+    <div className="space-y-5">
+      <PageTitle
+        title={service.service_name}
+        description={`${service.environment} · Last seen ${formatTimestamp(service.last_seen_at)}`}
+        actions={
+          <Link href="/service-map" className="rp-button">
+            Back to Service Map
+          </Link>
+        }
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard label="Requests" value={formatNumber(service.request_count)} />
-        <StatCard label="Errors" value={formatNumber(service.error_count)} />
-        <StatCard
+      <Panel className="p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <HealthBadge status={service.health_status} />
+          <StatusBadge status="Web Service" />
+          <StatusBadge status={service.latest_version ?? 'unknown version'} />
+          <StatusBadge status={service.environment} />
+        </div>
+      </Panel>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <SummaryCard
+          label="Requests/min"
+          value={formatNumber(Math.round(service.request_count / 60))}
+          tone="info"
+        />
+        <SummaryCard label="Errors" value={formatNumber(service.error_count)} tone="bad" />
+        <SummaryCard
           label="Error Rate"
           value={formatPercent(service.error_count, service.request_count)}
+          tone={service.error_count > 0 ? 'bad' : 'good'}
         />
-        <StatCard label="p95 Latency" value={formatMs(service.p95_latency_ms)} />
+        <SummaryCard label="p95 Latency" value={formatMs(service.p95_latency_ms)} tone="warn" />
+        <SummaryCard label="SLO Availability" value={`${availability.toFixed(2)}%`} tone="good" />
+        <SummaryCard label="Version" value={service.latest_version ?? '-'} tone="purple" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -205,7 +216,7 @@ function ServiceDetailContent() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+        <Panel className="p-5">
           <h2 className="text-lg font-semibold text-white mb-4">Recent Deployments</h2>
           {state.deployments.length === 0 ? (
             <p className="text-sm text-gray-400">No recent deployments for this service.</p>
@@ -215,7 +226,7 @@ function ServiceDetailContent() {
                 <Link
                   key={deployment.deployment_id}
                   href={`/deployments/${encodeURIComponent(deployment.deployment_id)}`}
-                  className="block border border-surface-border rounded p-3 hover:border-sidebar-active"
+                  className="block rounded border border-surface-border bg-surface-subtle p-3 hover:border-cyan-400/50"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-white font-medium">{deployment.version}</span>
@@ -230,9 +241,9 @@ function ServiceDetailContent() {
               ))}
             </div>
           )}
-        </section>
+        </Panel>
 
-        <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+        <Panel className="p-5">
           <h2 className="text-lg font-semibold text-white mb-4">Error Groups</h2>
           {state.errorGroups.length === 0 ? (
             <p className="text-sm text-gray-400">No grouped errors for this service.</p>
@@ -241,8 +252,8 @@ function ServiceDetailContent() {
               {state.errorGroups.slice(0, 5).map((group) => (
                 <Link
                   key={group.id}
-                  href={`/error-groups?service=${encodeURIComponent(service.service_name)}`}
-                  className="block border border-surface-border rounded p-3 hover:border-sidebar-active"
+                  href={`/error-groups/${encodeURIComponent(group.id)}`}
+                  className="block rounded border border-surface-border bg-surface-subtle p-3 hover:border-red-400/50"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-red-300 font-medium">
@@ -255,10 +266,10 @@ function ServiceDetailContent() {
               ))}
             </div>
           )}
-        </section>
+        </Panel>
       </div>
 
-      <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+      <Panel className="p-5">
         <h2 className="text-lg font-semibold text-white mb-4">Timeline</h2>
         {state.timeline.length === 0 ? (
           <p className="text-sm text-gray-400">No timeline events yet.</p>
@@ -275,10 +286,10 @@ function ServiceDetailContent() {
             ))}
           </div>
         )}
-      </section>
+      </Panel>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+        <Panel className="p-5">
           <h2 className="text-lg font-semibold text-white mb-4">Example Traces</h2>
           {state.traces.length === 0 ? (
             <p className="text-sm text-gray-400">No recent traces for this service.</p>
@@ -288,7 +299,7 @@ function ServiceDetailContent() {
                 <Link
                   key={trace.trace_id}
                   href={`/traces/${encodeURIComponent(trace.trace_id)}`}
-                  className="flex items-center justify-between gap-3 border border-surface-border rounded p-3 hover:border-sidebar-active"
+                  className="flex items-center justify-between gap-3 rounded border border-surface-border bg-surface-subtle p-3 hover:border-purple-400/50"
                 >
                   <span className="min-w-0">
                     <span className="block text-sm text-white truncate">
@@ -301,16 +312,19 @@ function ServiceDetailContent() {
               ))}
             </div>
           )}
-        </section>
+        </Panel>
 
-        <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+        <Panel className="p-5">
           <h2 className="text-lg font-semibold text-white mb-4">Recent Logs</h2>
           {state.logs.length === 0 ? (
             <p className="text-sm text-gray-400">No recent logs for this service.</p>
           ) : (
             <div className="space-y-2">
               {state.logs.map((log) => (
-                <div key={log.id} className="border border-surface-border rounded p-3">
+                <div
+                  key={log.id}
+                  className="rounded border border-surface-border bg-surface-subtle p-3"
+                >
                   <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                     <span className={log.severity === 'ERROR' ? 'text-red-300' : 'text-gray-300'}>
                       {log.severity}
@@ -322,7 +336,7 @@ function ServiceDetailContent() {
               ))}
             </div>
           )}
-        </section>
+        </Panel>
       </div>
     </div>
   );
@@ -338,14 +352,14 @@ function DependencyTable({
   mode: 'upstream' | 'downstream';
 }) {
   return (
-    <section className="bg-surface-card border border-surface-border rounded-lg p-5">
+    <Panel className="p-5">
       <h2 className="text-lg font-semibold text-white mb-4">{title}</h2>
       {dependencies.length === 0 ? (
-        <p className="text-sm text-gray-400">No {title.toLowerCase()} dependencies found.</p>
+        <EmptyState title={`No ${title.toLowerCase()} dependencies found`} />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-gray-500 uppercase">
+          <table className="rp-table">
+            <thead>
               <tr>
                 <th className="pb-2">Service</th>
                 <th className="pb-2">Calls</th>
@@ -358,7 +372,7 @@ function DependencyTable({
                 const service =
                   mode === 'upstream' ? dependency.source_service : dependency.target_service;
                 return (
-                  <tr key={dependency.id} className="border-t border-surface-border">
+                  <tr key={dependency.id}>
                     <td className="py-2 pr-3 text-white">{service}</td>
                     <td className="py-2 pr-3 text-gray-300">
                       {formatNumber(dependency.call_count)}
@@ -374,16 +388,7 @@ function DependencyTable({
           </table>
         </div>
       )}
-    </section>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-surface-card border border-surface-border rounded-lg p-5">
-      <p className="text-sm text-gray-400">{label}</p>
-      <p className="text-2xl font-semibold text-white mt-2">{value}</p>
-    </div>
+    </Panel>
   );
 }
 
@@ -396,10 +401,6 @@ function normalizeService(service: ServiceSummary): ServiceSummary {
     avg_latency_ms: service.avg_latency_ms ?? 0,
     p95_latency_ms: service.p95_latency_ms ?? 0,
   };
-}
-
-function titleCase(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function timelineDot(severity: string): string {
